@@ -1,0 +1,8 @@
+{
+  "name": "GBS Master Skill Registry",
+  "version": "1.0",
+  "description": "Global Business Suite Master Skill Registry",
+  "skills": [
+    "gbs-master-skill"
+  ]
+}

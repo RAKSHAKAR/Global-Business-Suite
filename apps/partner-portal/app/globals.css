@@ -1,0 +1,295 @@
+@import "../../../packages/gbs-design-system.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2D2D2D; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #404040; }
+
+.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Portal shell: all surfaces resolve through the shared GBS theme tokens. */
+.gbs-partner-shell {
+  background: var(--gbs-bg-page);
+  color: var(--gbs-text-primary);
+}
+
+.gbs-partner-public-route {
+  background: var(--gbs-bg-page);
+  color: var(--gbs-text-primary);
+}
+
+.gbs-public-route-controls {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.gbs-partner-header {
+  background: color-mix(in srgb, var(--gbs-bg-header) 94%, transparent);
+  border-bottom: 1px solid var(--gbs-border-color);
+  color: var(--gbs-text-primary);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.gbs-partner-header p + p {
+  color: var(--gbs-text-secondary);
+}
+
+.gbs-partner-sidebar {
+  background: var(--gbs-bg-sidebar);
+  border-right: 1px solid color-mix(in srgb, white 12%, transparent);
+}
+
+.gbs-theme-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.1875rem;
+  border: 1px solid var(--gbs-border-color);
+  border-radius: var(--gbs-radius-md);
+  background: var(--gbs-bg-surface-hover);
+}
+
+.gbs-theme-option {
+  display: inline-flex;
+  min-width: 2rem;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-radius: calc(var(--gbs-radius-md) - 3px);
+  background: transparent;
+  color: var(--gbs-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  transition: background var(--gbs-transition-fast), color var(--gbs-transition-fast), box-shadow var(--gbs-transition-fast);
+}
+
+.gbs-theme-option:hover {
+  color: var(--gbs-text-primary);
+}
+
+.gbs-theme-option[aria-pressed="true"],
+html[data-theme-preference="light"] .gbs-theme-option[data-theme-option="light"],
+html[data-theme-preference="system"] .gbs-theme-option[data-theme-option="system"],
+html[data-theme-preference="dark"] .gbs-theme-option[data-theme-option="dark"] {
+  background: var(--gbs-bg-surface);
+  color: var(--gbs-text-brand);
+  box-shadow: var(--gbs-shadow-xs);
+}
+
+.gbs-theme-option:focus-visible,
+.gbs-portal-switcher summary:focus-visible,
+.gbs-portal-menu a:focus-visible {
+  outline: 2px solid var(--gbs-border-focus);
+  outline-offset: 2px;
+}
+
+.gbs-portal-switcher {
+  position: relative;
+  color: var(--gbs-text-primary);
+}
+
+.gbs-portal-switcher summary {
+  display: inline-flex;
+  min-height: 2.4rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--gbs-border-color);
+  border-radius: var(--gbs-radius-md);
+  background: var(--gbs-bg-surface);
+  color: var(--gbs-text-primary);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  list-style: none;
+}
+
+.gbs-portal-switcher summary::-webkit-details-marker {
+  display: none;
+}
+
+.gbs-portal-switcher[open] summary {
+  border-color: var(--gbs-border-focus);
+  box-shadow: var(--gbs-focus-ring);
+}
+
+.gbs-portal-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 80;
+  display: grid;
+  width: min(17rem, calc(100vw - 2rem));
+  gap: 0.25rem;
+  padding: 0.45rem;
+  border: 1px solid var(--gbs-border-color);
+  border-radius: var(--gbs-radius-lg);
+  background: var(--gbs-bg-surface);
+  box-shadow: var(--gbs-shadow-xl);
+}
+
+.gbs-portal-menu a,
+.gbs-portal-menu > span {
+  display: flex;
+  min-height: 2.65rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--gbs-radius-md);
+  color: var(--gbs-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.gbs-portal-menu a:hover {
+  background: var(--gbs-bg-surface-hover);
+  color: var(--gbs-text-brand);
+}
+
+.gbs-portal-menu .is-current {
+  background: var(--gbs-color-primary-light);
+  color: var(--gbs-text-brand);
+}
+
+.gbs-portal-menu small {
+  color: var(--gbs-text-secondary);
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* The partner pages predate the shared tokens. These compatibility mappings
+   make their existing light and dark utility surfaces follow the root theme. */
+html[data-theme="light"] .gbs-partner-shell :is(
+  [class~="bg-[#121212]"],
+  [class~="bg-[#1A1A1A]"],
+  [class~="bg-[#1C1917]"],
+  [class~="bg-[#1E1E1E]"],
+  [class~="bg-[#242424]"],
+  [class~="bg-[#292524]"],
+  .bg-gray-800,
+  .bg-gray-900,
+  .bg-black
+) {
+  background-color: var(--gbs-bg-surface) !important;
+}
+
+html[data-theme="light"] .gbs-partner-shell :is(
+  [class~="border-[#2A2A2A]"],
+  [class~="border-[#333]"],
+  .border-gray-700,
+  .border-gray-800
+) {
+  border-color: var(--gbs-border-color) !important;
+}
+
+html[data-theme="light"] .gbs-partner-shell :is(.text-white, .text-gray-100, .text-gray-200, .text-gray-300) {
+  color: var(--gbs-text-primary) !important;
+}
+
+html[data-theme="light"] .gbs-partner-shell :is(.text-gray-400, .text-gray-500, .text-gray-600) {
+  color: var(--gbs-text-secondary) !important;
+}
+
+html[data-theme="light"] .gbs-partner-sidebar :is(.text-white, .text-gray-100, .text-gray-200, .text-gray-300),
+html[data-theme="light"] .gbs-partner-shell :is([class*="bg-blue-"], [class*="bg-indigo-"], [class*="bg-purple-"], [class*="bg-emerald-"], [class*="bg-red-"], [class*="bg-black"]).text-white,
+html[data-theme="light"] .gbs-partner-shell :is([class*="bg-blue-"], [class*="bg-indigo-"], [class*="bg-purple-"], [class*="bg-emerald-"], [class*="bg-red-"], [class*="bg-black"]) .text-white {
+  color: #fff !important;
+}
+
+html[data-theme="dark"] .gbs-partner-shell :is(.bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50) {
+  background-color: var(--gbs-bg-surface) !important;
+}
+
+html[data-theme="dark"] .gbs-partner-shell :is(.text-gray-900, .text-gray-800, .text-gray-700, .text-slate-900) {
+  color: var(--gbs-text-primary) !important;
+}
+
+html[data-theme="dark"] .gbs-partner-shell :is(.text-gray-600, .text-gray-500, .text-slate-600, .text-slate-500) {
+  color: var(--gbs-text-secondary) !important;
+}
+
+html[data-theme="dark"] .gbs-partner-shell :is(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-200) {
+  border-color: var(--gbs-border-color) !important;
+}
+
+html[data-theme="dark"] .gbs-partner-public-route :is(.bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, [class~="bg-[#FDFBF7]"]) {
+  background-color: var(--gbs-bg-surface) !important;
+}
+
+html[data-theme="dark"] .gbs-partner-public-route :is(.text-gray-900, .text-gray-800, .text-gray-700, .text-slate-900, .text-slate-800, .text-slate-700) {
+  color: var(--gbs-text-primary) !important;
+}
+
+html[data-theme="dark"] .gbs-partner-public-route :is(.text-gray-600, .text-gray-500, .text-slate-600, .text-slate-500) {
+  color: var(--gbs-text-secondary) !important;
+}
+
+html[data-theme="dark"] .gbs-partner-public-route :is(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-200) {
+  border-color: var(--gbs-border-color) !important;
+}
+
+html[data-theme="light"] .gbs-partner-public-route :is([class~="bg-[#1C1917]"], [class~="bg-[#292524]"]) {
+  background-color: var(--gbs-bg-surface) !important;
+}
+
+html[data-theme="light"] .gbs-partner-public-route :is(.text-white, .text-gray-100, .text-gray-200) {
+  color: var(--gbs-text-primary) !important;
+}
+
+@media (max-width: 639px) {
+  .gbs-theme-option-label {
+    display: none;
+  }
+
+  .gbs-portal-switcher summary > span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,258 @@
+{
+  "metadata": {
+    "system": "Global Business Suite (GBS)",
+    "version": "9.0",
+    "type": "FULL",
+    "timestamp": "2026-08-07T02:49:12.918Z",
+    "counts": {
+      "tenants": 3,
+      "users": 5,
+      "roles": 2,
+      "permissions": 15,
+      "auditLogs": 18,
+      "aiUsageLogs": 39,
+      "countries": 0,
+      "currencies": 0
+    }
+  },
+  "data": {
+    "tenants": [
+      {
+        "id": "09aee359-d4a5-4e74-b9ca-245ac8f00654",
+        "name": "Demo Company",
+        "domain": "demo.platform.local",
+        "subdomain": "demo",
+        "logoUrl": null,
+        "primaryColor": "#D4AF37",
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-08-06T21:38:44.989Z",
+        "updatedAt": "2026-08-06T21:38:44.989Z"
+      },
+      {
+        "id": "tenant_demo_1",
+        "name": "Demo Customer Tenant",
+        "domain": "demo-cust-tenant_demo_1.gbs.com",
+        "subdomain": null,
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-08-06T23:15:11.188Z",
+        "updatedAt": "2026-08-06T23:15:11.188Z"
+      },
+      {
+        "id": "d8cef76e-71c9-495b-8163-967fd2ffa62f",
+        "name": "Phase 9 Enterprise Test Tenant",
+        "domain": "phase9.test.local",
+        "subdomain": null,
+        "logoUrl": null,
+        "primaryColor": "#D4AF37",
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": "ddad8a5e-80d3-41d7-a85b-b772c773af5a",
+        "version": 1,
+        "createdAt": "2026-08-07T02:49:09.274Z",
+        "updatedAt": "2026-08-07T02:49:10.981Z"
+      }
+    ],
+    "users": [
+      {
+        "id": "92f97373-9fdb-4a12-a03f-1c1f8295fe03",
+        "email": "admin@enterprise.com",
+        "tenantId": null,
+        "isDeleted": false
+      },
+      {
+        "id": "a9613460-1349-45a9-8648-b4fece851ad9",
+        "email": "partner@demo.com",
+        "tenantId": "09aee359-d4a5-4e74-b9ca-245ac8f00654",
+        "isDeleted": false
+      },
+      {
+        "id": "f222f4cc-9d60-4be5-b760-8cfe048f7ef3",
+        "email": "customer@demo.com",
+        "tenantId": "09aee359-d4a5-4e74-b9ca-245ac8f00654",
+        "isDeleted": false
+      },
+      {
+        "id": "4ee4ee48-d0fc-4bfa-b5c9-c8211e0f6585",
+        "email": "testuser_1786057991843@enterprise.com",
+        "tenantId": null,
+        "isDeleted": false
+      },
+      {
+        "id": "ddad8a5e-80d3-41d7-a85b-b772c773af5a",
+        "email": "phase9.test@platform.local",
+        "tenantId": "d8cef76e-71c9-495b-8163-967fd2ffa62f",
+        "isDeleted": false
+      }
+    ],
+    "roles": [
+      {
+        "id": "52d15cf8-903f-421e-8308-d7d71ce1d11d",
+        "name": "Super Admin",
+        "description": "Full platform access",
+        "isSystem": true,
+        "tenantId": null,
+        "createdAt": "2026-08-06T21:38:44.549Z",
+        "updatedAt": "2026-08-06T21:38:44.549Z"
+      },
+      {
+        "id": "0f528452-02b6-4826-b6cf-ded67fccbfb0",
+        "name": "Partner",
+        "description": "Partner access within tenant",
+        "isSystem": false,
+        "tenantId": "09aee359-d4a5-4e74-b9ca-245ac8f00654",
+        "createdAt": "2026-08-06T21:38:44.996Z",
+        "updatedAt": "2026-08-06T21:38:44.996Z"
+      }
+    ],
+    "permissions": [
+      {
+        "id": "ce1727a2-20b3-4edf-aa73-87fe4cdb7dba",
+        "resource": "users",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage users"
+      },
+      {
+        "id": "5c5823cb-fb4f-4be8-946f-d5610ea4478e",
+        "resource": "tenants",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage tenants"
+      },
+      {
+        "id": "d172ba68-52fa-4c4b-b8b4-77082e07e9db",
+        "resource": "billing",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage billing"
+      },
+      {
+        "id": "80708316-cccf-44b4-bfb7-7c36f3501d8e",
+        "resource": "roles",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage roles"
+      },
+      {
+        "id": "2bfc7c6c-98c4-4c30-9bea-d5ed555e475e",
+        "resource": "settings",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage settings"
+      },
+      {
+        "id": "238d70a7-96a6-4156-901d-365eda025eb9",
+        "resource": "ai",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage ai"
+      },
+      {
+        "id": "40e60ab9-0c1b-4b54-8bff-1e0007b15002",
+        "resource": "support",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage support"
+      },
+      {
+        "id": "fae3df44-994d-48f6-8966-a39e1d45d8ce",
+        "resource": "social",
+        "action": "create",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "create social"
+      },
+      {
+        "id": "286cc843-1549-4ae8-8feb-df9728620649",
+        "resource": "social",
+        "action": "read",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "read social"
+      },
+      {
+        "id": "32d2192f-1052-4904-bb02-7bc893cf75f6",
+        "resource": "clients",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage clients"
+      },
+      {
+        "id": "097722c0-d506-4eca-8347-5a588bc660fb",
+        "resource": "crm",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage crm"
+      },
+      {
+        "id": "b2d77122-b490-4c04-b5dc-3fc74ac70abd",
+        "resource": "leads",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage leads"
+      },
+      {
+        "id": "c00fe64d-95d6-42da-94ca-321bf5c3d9d8",
+        "resource": "marketing",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage marketing"
+      },
+      {
+        "id": "4a548f4b-6875-4579-8674-181237e36bbd",
+        "resource": "customer_success",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage customer_success"
+      },
+      {
+        "id": "a6805cad-63d2-416f-af4f-6af576a54cb3",
+        "resource": "documents",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage documents"
+      }
+    ],
+    "countries": [],
+    "currencies": []
+  }
+}

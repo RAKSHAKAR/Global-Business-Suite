@@ -1,0 +1,603 @@
+{
+  "metadata": {
+    "system": "Global Business Suite (GBS)",
+    "version": "9.0",
+    "type": "FULL",
+    "timestamp": "2026-08-06T20:28:20.280Z",
+    "counts": {
+      "tenants": 12,
+      "users": 14,
+      "roles": 5,
+      "permissions": 14,
+      "auditLogs": 12,
+      "aiUsageLogs": 3,
+      "countries": 5,
+      "currencies": 4
+    }
+  },
+  "data": {
+    "tenants": [
+      {
+        "id": "0ddc19b7-719a-48db-9d8c-09c846ef2ce3",
+        "name": "Updated Tenant",
+        "domain": "admin.platform.local",
+        "subdomain": null,
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-07-20T12:34:05.149Z",
+        "updatedAt": "2026-07-20T17:38:45.848Z"
+      },
+      {
+        "id": "3a984528-12e2-406b-a890-e13d05061ee2",
+        "name": "Test Tenant XYZ",
+        "domain": "testtenantxyz.platform.local",
+        "subdomain": null,
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": false,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-07-20T16:29:58.945Z",
+        "updatedAt": "2026-07-20T16:29:58.985Z"
+      },
+      {
+        "id": "4cf9a422-92ca-47d3-9a96-260bf6da0594",
+        "name": "New Demo Tenant",
+        "domain": "newdemotenant.platform.local",
+        "subdomain": null,
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": false,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-07-20T17:13:38.344Z",
+        "updatedAt": "2026-07-20T17:13:47.452Z"
+      },
+      {
+        "id": "24e367d0-bf25-4c38-9157-f9faf6b30e00",
+        "name": "Mobile Tenant",
+        "domain": "mobiletenant.platform.local",
+        "subdomain": null,
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-07-20T17:18:49.812Z",
+        "updatedAt": "2026-07-20T17:18:49.812Z"
+      },
+      {
+        "id": "e6e65cda-9abe-4ae9-b98e-64af45245df5",
+        "name": "Demo Partner",
+        "domain": "demo.platform.local",
+        "subdomain": null,
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-07-20T18:08:45.552Z",
+        "updatedAt": "2026-07-20T18:08:45.552Z"
+      },
+      {
+        "id": "bc477b87-e03a-45d2-af30-0898f63c11d7",
+        "name": "New Test Tenant",
+        "domain": "newtesttenant.platform.local",
+        "subdomain": null,
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-07-20T18:11:17.081Z",
+        "updatedAt": "2026-07-20T18:11:17.081Z"
+      },
+      {
+        "id": "12417f4d-6350-4318-9977-f732b2b44f0e",
+        "name": "Acme Test",
+        "domain": "acmetest.platform.local",
+        "subdomain": "acmetest",
+        "logoUrl": null,
+        "primaryColor": "#D4AF37",
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-07-27T04:57:39.293Z",
+        "updatedAt": "2026-07-27T04:57:39.293Z"
+      },
+      {
+        "id": "tenant_demo_1",
+        "name": "Demo Partner Tenant",
+        "domain": "demo-tenant_demo_1.gbs.com",
+        "subdomain": null,
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-08-06T11:14:13.501Z",
+        "updatedAt": "2026-08-06T11:14:13.501Z"
+      },
+      {
+        "id": "6b99a864-02fd-477f-9a66-8efc0a1cb1d5",
+        "name": "Automated Tenant 1786040869648",
+        "domain": "automatedtenant1786040869648.platform.local",
+        "subdomain": "test-sub-1786040869649",
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-08-06T18:27:49.660Z",
+        "updatedAt": "2026-08-06T18:27:49.660Z"
+      },
+      {
+        "id": "d23cd337-84f4-40e3-9316-0bdc615598cb",
+        "name": "Automated Tenant 1786040925447",
+        "domain": "automatedtenant1786040925447.platform.local",
+        "subdomain": "test-sub-1786040925448",
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-08-06T18:28:45.453Z",
+        "updatedAt": "2026-08-06T18:28:45.453Z"
+      },
+      {
+        "id": "53ac531e-609c-4487-8a91-49f97d81f533",
+        "name": "Automated Tenant 1786044169315",
+        "domain": "automatedtenant1786044169315.platform.local",
+        "subdomain": "test-sub-1786044169320",
+        "logoUrl": null,
+        "primaryColor": null,
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": null,
+        "version": 1,
+        "createdAt": "2026-08-06T19:22:49.345Z",
+        "updatedAt": "2026-08-06T19:22:49.345Z"
+      },
+      {
+        "id": "a776f14d-16aa-4172-a48d-d5f70955f440",
+        "name": "Phase 9 Enterprise Test Tenant",
+        "domain": "phase9.test.local",
+        "subdomain": null,
+        "logoUrl": null,
+        "primaryColor": "#D4AF37",
+        "isActive": true,
+        "themeSettingsJson": null,
+        "seoSettingsJson": null,
+        "featuresJson": null,
+        "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
+        "createdBy": null,
+        "updatedBy": "5a68f395-dd9c-4b51-9f91-025ba948df1f",
+        "version": 1,
+        "createdAt": "2026-08-06T20:27:44.858Z",
+        "updatedAt": "2026-08-06T20:28:20.222Z"
+      }
+    ],
+    "users": [
+      {
+        "id": "4f0b7df9-0212-4ad0-97dd-e2ce7ccb5d65",
+        "email": "admin@platform.local",
+        "tenantId": "0ddc19b7-719a-48db-9d8c-09c846ef2ce3",
+        "isDeleted": false
+      },
+      {
+        "id": "a31f70a4-fe26-4e0c-834d-5f1b6ee06b48",
+        "email": "user@testtenantxyz.com",
+        "tenantId": "3a984528-12e2-406b-a890-e13d05061ee2",
+        "isDeleted": false
+      },
+      {
+        "id": "11f74757-8d55-4919-8175-9f57f3b34736",
+        "email": "john@example.com",
+        "tenantId": "3a984528-12e2-406b-a890-e13d05061ee2",
+        "isDeleted": false
+      },
+      {
+        "id": "b1304624-798e-49f0-9334-ac489bc0459b",
+        "email": "partner@demo.local",
+        "tenantId": "e6e65cda-9abe-4ae9-b98e-64af45245df5",
+        "isDeleted": false
+      },
+      {
+        "id": "d1b18eb3-f08d-4a7d-a362-f7ccbdf57185",
+        "email": "admin@enterprise.com",
+        "tenantId": null,
+        "isDeleted": false
+      },
+      {
+        "id": "50887097-0459-4095-9b5f-e9acd934a0b7",
+        "email": "partner@demo.com",
+        "tenantId": "e6e65cda-9abe-4ae9-b98e-64af45245df5",
+        "isDeleted": false
+      },
+      {
+        "id": "6245c674-dadd-4939-8f81-95369d0e1ff0",
+        "email": "customer@demo.com",
+        "tenantId": "e6e65cda-9abe-4ae9-b98e-64af45245df5",
+        "isDeleted": false
+      },
+      {
+        "id": "532fd287-edb0-4282-81ad-2f26b6745a20",
+        "email": "newcustomer@demo.com",
+        "tenantId": null,
+        "isDeleted": false
+      },
+      {
+        "id": "aee8847d-603b-4329-a106-552ed994ae51",
+        "email": "testuser_1786040753569@enterprise.com",
+        "tenantId": null,
+        "isDeleted": false
+      },
+      {
+        "id": "e6c2322f-811d-4395-a51c-5af730dd7137",
+        "email": "testuser_1786040820782@enterprise.com",
+        "tenantId": null,
+        "isDeleted": false
+      },
+      {
+        "id": "6848543f-aa82-4e33-9504-dddc0a4f47b4",
+        "email": "testuser_1786040873848@enterprise.com",
+        "tenantId": null,
+        "isDeleted": false
+      },
+      {
+        "id": "ffb14d58-4650-49ce-881a-05f8890ee171",
+        "email": "testuser_1786040928924@enterprise.com",
+        "tenantId": null,
+        "isDeleted": false
+      },
+      {
+        "id": "274caad1-345a-4686-964f-853f13b34096",
+        "email": "testuser_1786044143361@enterprise.com",
+        "tenantId": null,
+        "isDeleted": false
+      },
+      {
+        "id": "5a68f395-dd9c-4b51-9f91-025ba948df1f",
+        "email": "phase9.test@platform.local",
+        "tenantId": "a776f14d-16aa-4172-a48d-d5f70955f440",
+        "isDeleted": false
+      }
+    ],
+    "roles": [
+      {
+        "id": "08706911-eacf-4d59-bb85-517d50daf246",
+        "name": "Super Administrator",
+        "description": "System-wide full access",
+        "isSystem": true,
+        "tenantId": "0ddc19b7-719a-48db-9d8c-09c846ef2ce3",
+        "createdAt": "2026-07-20T12:34:05.184Z",
+        "updatedAt": "2026-07-20T12:34:05.184Z"
+      },
+      {
+        "id": "95b67205-89c6-46b7-bc55-328ed55a023d",
+        "name": "Local Creator",
+        "description": "Updated Desc",
+        "isSystem": false,
+        "tenantId": "3a984528-12e2-406b-a890-e13d05061ee2",
+        "createdAt": "2026-07-20T17:26:12.098Z",
+        "updatedAt": "2026-07-20T17:40:09.305Z"
+      },
+      {
+        "id": "0ce16002-6084-4b61-98d9-e987acaeb3d4",
+        "name": "Super Admin",
+        "description": "Global administrator",
+        "isSystem": true,
+        "tenantId": null,
+        "createdAt": "2026-07-20T18:08:45.523Z",
+        "updatedAt": "2026-07-20T18:08:45.523Z"
+      },
+      {
+        "id": "0eae1785-fec1-4340-b388-f3cbc5ad7663",
+        "name": "Partner Admin",
+        "description": "Partner administrator",
+        "isSystem": false,
+        "tenantId": "e6e65cda-9abe-4ae9-b98e-64af45245df5",
+        "createdAt": "2026-07-20T18:08:45.580Z",
+        "updatedAt": "2026-07-20T18:08:45.580Z"
+      },
+      {
+        "id": "366749df-837a-4bd2-bf72-49e8e99d43e4",
+        "name": "Partner",
+        "description": "Partner access within tenant",
+        "isSystem": false,
+        "tenantId": "e6e65cda-9abe-4ae9-b98e-64af45245df5",
+        "createdAt": "2026-07-24T12:06:50.904Z",
+        "updatedAt": "2026-07-24T12:06:50.904Z"
+      }
+    ],
+    "permissions": [
+      {
+        "id": "800f7b37-7e6f-4fd4-a480-43d6f811011b",
+        "resource": "tenants",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "Can manage tenants"
+      },
+      {
+        "id": "c52d78b9-f690-4dac-8b57-39e2e6d7cae2",
+        "resource": "users",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "Can manage users"
+      },
+      {
+        "id": "e97b9768-8b16-422e-9011-2e06df057a15",
+        "resource": "roles",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "Can manage roles"
+      },
+      {
+        "id": "e4ea4aca-9515-4f21-8b64-6035dcb474a0",
+        "resource": "*",
+        "action": "*",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "All access"
+      },
+      {
+        "id": "61d33219-e63e-4c0b-a5a6-3902e480e58d",
+        "resource": "clients",
+        "action": "*",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "clients access"
+      },
+      {
+        "id": "69e310f9-3323-4103-9086-f62e0807a940",
+        "resource": "social-posts",
+        "action": "*",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "social-posts access"
+      },
+      {
+        "id": "f8dfe07a-20bd-4e67-99e5-23a945758bad",
+        "resource": "ai-content",
+        "action": "*",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "ai-content access"
+      },
+      {
+        "id": "63ae14dd-6d6a-4088-9421-03b7cdb09780",
+        "resource": "billing",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage billing"
+      },
+      {
+        "id": "0711f3be-9cb7-4ee9-976e-5dbfd983965c",
+        "resource": "settings",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage settings"
+      },
+      {
+        "id": "061fcc67-0dfe-484b-b7f8-fbb933e4efcc",
+        "resource": "ai",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage ai"
+      },
+      {
+        "id": "852196b4-08c8-42e9-af55-f92d9b581be1",
+        "resource": "support",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage support"
+      },
+      {
+        "id": "22a51cf3-2afc-482f-be10-15a120e7fb58",
+        "resource": "social",
+        "action": "create",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "create social"
+      },
+      {
+        "id": "7a5bba40-32a3-4d87-897f-9ae1296329e2",
+        "resource": "social",
+        "action": "read",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "read social"
+      },
+      {
+        "id": "fb531dec-4853-4392-a8fc-04ff46f1b733",
+        "resource": "clients",
+        "action": "manage",
+        "category": "GENERAL",
+        "scope": "TENANT",
+        "description": "manage clients"
+      }
+    ],
+    "countries": [
+      {
+        "id": "f979f545-9750-47aa-acde-8ae03c51a5a0",
+        "code": "US",
+        "name": "United States",
+        "phoneCode": "+1",
+        "currencyCode": "USD",
+        "isActive": true,
+        "createdAt": "2026-08-06T20:26:58.590Z",
+        "updatedAt": "2026-08-06T20:26:58.590Z"
+      },
+      {
+        "id": "17ccade5-563d-4432-8306-3e49f9d399a5",
+        "code": "IN",
+        "name": "India",
+        "phoneCode": "+91",
+        "currencyCode": "INR",
+        "isActive": true,
+        "createdAt": "2026-08-06T20:26:58.601Z",
+        "updatedAt": "2026-08-06T20:26:58.601Z"
+      },
+      {
+        "id": "14e33a6b-7224-4fd5-945b-7774f6985955",
+        "code": "GB",
+        "name": "United Kingdom",
+        "phoneCode": "+44",
+        "currencyCode": "GBP",
+        "isActive": true,
+        "createdAt": "2026-08-06T20:26:58.612Z",
+        "updatedAt": "2026-08-06T20:26:58.612Z"
+      },
+      {
+        "id": "8a13b15e-fc2a-4bfa-ae12-8bba2dbb5349",
+        "code": "CA",
+        "name": "Canada",
+        "phoneCode": "+1",
+        "currencyCode": "CAD",
+        "isActive": true,
+        "createdAt": "2026-08-06T20:26:58.623Z",
+        "updatedAt": "2026-08-06T20:26:58.623Z"
+      },
+      {
+        "id": "e867e515-c0d6-4c93-970d-806d08308cd9",
+        "code": "AU",
+        "name": "Australia",
+        "phoneCode": "+61",
+        "currencyCode": "AUD",
+        "isActive": true,
+        "createdAt": "2026-08-06T20:26:58.633Z",
+        "updatedAt": "2026-08-06T20:26:58.633Z"
+      }
+    ],
+    "currencies": [
+      {
+        "id": "62e3c2ee-f918-450a-a137-5e4b97ed5e43",
+        "code": "USD",
+        "name": "US Dollar",
+        "symbol": "$",
+        "exchangeRate": 1,
+        "isActive": true,
+        "createdAt": "2026-08-06T20:26:58.641Z",
+        "updatedAt": "2026-08-06T20:26:58.641Z"
+      },
+      {
+        "id": "de72de1e-b1ca-413b-bd67-9a56d1f7b6ed",
+        "code": "EUR",
+        "name": "Euro",
+        "symbol": "€",
+        "exchangeRate": 0.92,
+        "isActive": true,
+        "createdAt": "2026-08-06T20:26:58.650Z",
+        "updatedAt": "2026-08-06T20:26:58.650Z"
+      },
+      {
+        "id": "4c656674-225d-41c3-8a28-e8a833903a59",
+        "code": "INR",
+        "name": "Indian Rupee",
+        "symbol": "₹",
+        "exchangeRate": 83.5,
+        "isActive": true,
+        "createdAt": "2026-08-06T20:26:58.658Z",
+        "updatedAt": "2026-08-06T20:26:58.658Z"
+      },
+      {
+        "id": "fc4f7b65-c235-4033-be60-632356fe4203",
+        "code": "GBP",
+        "name": "British Pound",
+        "symbol": "£",
+        "exchangeRate": 0.78,
+        "isActive": true,
+        "createdAt": "2026-08-06T20:26:58.665Z",
+        "updatedAt": "2026-08-06T20:26:58.665Z"
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "GBS Customer Mobile",
+    "slug": "customer-mobile",
+    "scheme": "gbscustomer",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-system-ui", "expo-secure-store"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gbs.customer",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allows GBS Customer to capture support attachments and document vault scans.",
+        "NSMicrophoneUsageDescription": "Allows GBS Customer to speak with AI Assistant tools.",
+        "NSFaceIDUsageDescription": "Allows GBS Customer to log in quickly with Face ID.",
+        "NSPhotoLibraryUsageDescription": "Allows GBS Customer to attach images to support tickets.",
+        "NSLocationWhenInUseUsageDescription": "Allows GBS Customer to find nearby service hubs."
+      }
+    },
+    "android": {
+      "package": "com.gbs.customer",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "USE_BIOMETRIC"
+      ],
+      "predictiveBackGestureEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

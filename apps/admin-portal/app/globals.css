@@ -1,0 +1,193 @@
+@import "../../../packages/gbs-design-system.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Admin preferences are applied to <html> before hydration by app/layout.tsx. */
+[data-primary-color="blue"] { --gbs-admin-accent: #2563eb; --gbs-admin-accent-hover: #1d4ed8; --gbs-admin-accent-soft: rgba(37, 99, 235, 0.2); }
+[data-primary-color="purple"] { --gbs-admin-accent: #7c3aed; --gbs-admin-accent-hover: #6d28d9; --gbs-admin-accent-soft: rgba(124, 58, 237, 0.2); }
+[data-primary-color="green"] { --gbs-admin-accent: #059669; --gbs-admin-accent-hover: #047857; --gbs-admin-accent-soft: rgba(5, 150, 105, 0.2); }
+[data-primary-color="cyan"] { --gbs-admin-accent: #0891b2; --gbs-admin-accent-hover: #0e7490; --gbs-admin-accent-soft: rgba(8, 145, 178, 0.2); }
+[data-primary-color="amber"] { --gbs-admin-accent: #d97706; --gbs-admin-accent-hover: #b45309; --gbs-admin-accent-soft: rgba(217, 119, 6, 0.2); }
+[data-primary-color="red"] { --gbs-admin-accent: #dc2626; --gbs-admin-accent-hover: #b91c1c; --gbs-admin-accent-soft: rgba(220, 38, 38, 0.2); }
+[data-primary-color="gray"] { --gbs-admin-accent: #475569; --gbs-admin-accent-hover: #334155; --gbs-admin-accent-soft: rgba(71, 85, 105, 0.2); }
+
+.gbs-admin-shell [class~="bg-blue-600"] {
+  background-color: var(--gbs-admin-accent, #2563eb) !important;
+}
+
+.gbs-admin-shell [class~="bg-blue-600/20"],
+.gbs-admin-shell [class~="bg-blue-500/20"] {
+  background-color: var(--gbs-admin-accent-soft, rgba(37, 99, 235, 0.2)) !important;
+}
+
+.gbs-admin-shell [class~="text-blue-300"],
+.gbs-admin-shell [class~="text-blue-400"],
+.gbs-admin-shell [class~="text-blue-500"] {
+  color: var(--gbs-admin-accent, #2563eb) !important;
+}
+
+.gbs-admin-shell [class~="border-blue-500"],
+.gbs-admin-shell [class~="border-blue-500/50"],
+.gbs-admin-shell [class~="border-blue-500/60"] {
+  border-color: var(--gbs-admin-accent, #2563eb) !important;
+}
+
+.gbs-admin-shell [class~="hover:bg-blue-500"]:hover,
+.gbs-admin-shell [class~="hover:bg-blue-600"]:hover {
+  background-color: var(--gbs-admin-accent-hover, #1d4ed8) !important;
+}
+
+/* The navigation remains navy in either theme; the content canvas and its cards switch. */
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] {
+  background-color: #f8fafc !important;
+  color: #0f172a;
+}
+
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-[#0B132B]"] {
+  background-color: #f8fafc !important;
+}
+
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-[#0D1832]"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-[#111C38]"] {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-[#070D1E]"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-gray-950"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-gray-950/30"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-gray-900"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-gray-900/60"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-gray-900/80"] {
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="text-white"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="text-gray-100"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="text-gray-200"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="text-gray-300"] {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="text-gray-400"] {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="text-gray-500"] {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class*="border-gray-8"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="border-[#1E2D54]"] {
+  border-color: #dbe3ee !important;
+}
+
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-blue-600"][class~="text-white"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-emerald-600"][class~="text-white"],
+[data-theme="light"] .gbs-admin-shell [data-testid="admin-content"] [class~="bg-red-600"][class~="text-white"] {
+  color: #ffffff !important;
+}
+
+.gbs-admin-dashboard [class~="rounded-2xl"] {
+  border-radius: var(--gbs-radius-xl, 12px);
+}
+
+/* At desktop widths the reference utility rail starts beside the banner, not below the KPIs. */
+@media (min-width: 1280px) {
+  .gbs-admin-dashboard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 16.5rem);
+    column-gap: 0.75rem;
+    row-gap: 0.75rem;
+    align-items: start;
+  }
+
+  .gbs-admin-dashboard > * {
+    margin-top: 0 !important;
+  }
+
+  .gbs-dashboard-banner { grid-column: 1; grid-row: 1; }
+  .gbs-dashboard-kpis { grid-column: 1; grid-row: 2; }
+  .gbs-dashboard-layout { display: contents; }
+  .gbs-dashboard-main { grid-column: 1 !important; grid-row: 3; }
+  .gbs-dashboard-rail { grid-column: 2 !important; grid-row: 1 / span 3; }
+  .gbs-dashboard-footer { grid-column: 1 / -1; grid-row: 4; }
+
+  [data-dashboard-layout="2"] .gbs-admin-dashboard {
+    grid-template-columns: minmax(0, 1fr) 14rem;
+    column-gap: 0.5rem;
+    row-gap: 0.5rem;
+  }
+
+  [data-dashboard-layout="2"] .gbs-dashboard-main,
+  [data-dashboard-layout="2"] .gbs-dashboard-kpis {
+    gap: 0.5rem;
+  }
+
+  [data-dashboard-layout="2"] .gbs-dashboard-main > div,
+  [data-dashboard-layout="2"] .gbs-dashboard-kpis > div,
+  [data-dashboard-layout="2"] .gbs-dashboard-rail > div {
+    padding: 0.75rem;
+  }
+
+  [data-dashboard-layout="3"] .gbs-admin-dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-dashboard-layout="3"] .gbs-dashboard-banner,
+  [data-dashboard-layout="3"] .gbs-dashboard-kpis,
+  [data-dashboard-layout="3"] .gbs-dashboard-main {
+    grid-column: 1 !important;
+  }
+
+  [data-dashboard-layout="3"] .gbs-dashboard-rail {
+    grid-column: 1 !important;
+    grid-row: 4;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  [data-dashboard-layout="3"] .gbs-dashboard-footer {
+    grid-row: 5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gbs-admin-shell *,
+  .gbs-admin-shell *::before,
+  .gbs-admin-shell *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4B5563; }
+
+/* Line clamp utilities */
+.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

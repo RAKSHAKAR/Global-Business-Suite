@@ -1,0 +1,158 @@
+# GBS Enterprise — Docker Compose Configuration
+# Removed deprecated 'version' key (Compose Spec v2+ does not require it)
+
+services:
+  # ── PostgreSQL Database ────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-enterprise_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-enterprise_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - gbs-network
+
+  # ── Redis Cache ────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-changeme_in_production}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-changeme_in_production}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - gbs-network
+
+  # ── GBS API Gateway ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-4000}:4000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme_in_production}@db:5432/${POSTGRES_DB:-enterprise_db}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-changeme_in_production}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID}
+      ADMIN_URL: ${ADMIN_URL:-http://localhost:3000}
+      PARTNER_URL: ${PARTNER_URL:-http://localhost:3001}
+      CUSTOMER_URL: ${CUSTOMER_URL:-http://localhost:3002}
+      WEB_URL: ${WEB_URL:-http://localhost:3003}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - gbs-network
+
+  # ── Admin Portal ───────────────────────────────────────────────────────────
+  admin-portal:
+    build:
+      context: ./apps/admin-portal
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-3000}:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL:-http://api:4000}
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - gbs-network
+
+  # ── Partner Portal ─────────────────────────────────────────────────────────
+  partner-portal:
+    build:
+      context: ./apps/partner-portal
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PARTNER_PORT:-3001}:3001"
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL:-http://api:4000}
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - gbs-network
+
+  # ── Customer Portal ────────────────────────────────────────────────────────
+  customer-portal:
+    build:
+      context: ./apps/customer-portal
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${CUSTOMER_PORT:-3002}:3002"
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL:-http://api:4000}
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - gbs-network
+
+  # ── Web Portal (Public Marketing Site) ────────────────────────────────────
+  web-portal:
+    build:
+      context: ./apps/web-portal
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3003}:3003"
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL:-http://api:4000}
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - gbs-network
+
+# ── Persistent Volumes ─────────────────────────────────────────────────────
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+
+# ── Internal Network ───────────────────────────────────────────────────────
+networks:
+  gbs-network:
+    driver: bridge

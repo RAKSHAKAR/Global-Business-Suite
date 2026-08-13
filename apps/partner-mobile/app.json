@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "GBS Partner Mobile",
+    "slug": "partner-mobile",
+    "scheme": "gbspartner",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-system-ui", "expo-secure-store"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gbs.partner",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allows GBS Partner to scan business cards and capture media for social posts.",
+        "NSMicrophoneUsageDescription": "Allows GBS Partner to use AI voice search and dictation.",
+        "NSFaceIDUsageDescription": "Allows GBS Partner to sign in securely with Face ID.",
+        "NSPhotoLibraryUsageDescription": "Allows GBS Partner to upload photos and videos to social media scheduler.",
+        "NSLocationWhenInUseUsageDescription": "Allows GBS Partner to tag Google Business Profile location posts."
+      }
+    },
+    "android": {
+      "package": "com.gbs.partner",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "USE_BIOMETRIC"
+      ],
+      "predictiveBackGestureEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

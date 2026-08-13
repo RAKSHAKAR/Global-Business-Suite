@@ -1,0 +1,4155 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Core Tenant Management
+// -----------------------------------------------------------------------------
+
+model Tenant {
+  id           String  @id @default(uuid())
+  name         String
+  domain       String? @unique
+  subdomain    String? @unique
+  logoUrl      String?
+  primaryColor String?
+  isActive     Boolean @default(true)
+
+  // White-label & Settings
+  themeSettingsJson String?
+  seoSettingsJson   String?
+  featuresJson      String?
+
+  // Soft Delete & Enterprise Audit
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  deletedBy String?
+  createdBy String?
+  updatedBy String?
+  version   Int       @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users           User[]
+  roles           Role[]
+  clients         Client[]
+  socialPosts     SocialPost[]
+  socialChannels  SocialChannel[]
+  aiContents      AiContent[]
+  aiConfigs       TenantAiConfig[]
+  automationRules AutomationRule[]
+
+  // Billing
+  subscriptions Subscription[]
+  invoices      Invoice[]
+
+  // Support
+  tickets Ticket[]
+
+  // GBP Integrations
+  locations Location[]
+}
+
+// -----------------------------------------------------------------------------
+// Identity & Authentication
+// -----------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  firstName     String?
+  lastName      String?
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+
+  // Phase 2 IAM Enhancements
+  phoneNumber             String?
+  phoneVerified           DateTime?
+  isLocked                Boolean   @default(false)
+  lockedUntil             DateTime?
+  failedLoginAttempts     Int       @default(0)
+  mfaEnabled              Boolean   @default(false)
+  mfaType                 String?   @default("TOTP") // TOTP, SMS_OTP, EMAIL_OTP
+  mustChangePassword      Boolean   @default(false)
+  passwordExpiresAt       DateTime?
+  lastPasswordChange      DateTime?
+  preferredLanguage       String    @default("en")
+  preferredTimezone       String    @default("UTC")
+  notificationPreferences String? // JSON settings
+
+  // Approval & Verification
+  approvalStatus   String                        @default("APPROVED") // PENDING, APPROVED, REJECTED, SUSPENDED, BLOCKED, ARCHIVED
+  isSuspended      Boolean                       @default(false)
+  suspensionReason String?
+  suspendedAt      DateTime?
+  partnerDocuments PartnerVerificationDocument[]
+  upgradeRequests  UpgradeRequest[]
+
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  roles           UserRole[]
+  sessions        Session[]
+  accounts        ProviderAccount[] // For OAuth
+  loginHistory    LoginHistory[]
+  devices         Device[]
+  passwordHistory PasswordHistory[]
+  notifications   Notification[]
+
+  // Soft Delete & Enterprise Audit
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  deletedBy String?
+  createdBy String?
+  updatedBy String?
+  version   Int       @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, isDeleted])
+}
+
+model Session {
+  id             String    @id @default(uuid())
+  sessionToken   String    @unique
+  userId         String
+  expires        DateTime
+  revokedAt      DateTime? // Set when session is explicitly invalidated (logout)
+  ipAddress      String?
+  userAgent      String?
+  lastActivityAt DateTime  @default(now())
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Used for self-service password reset flow.
+/// Token is stored as a SHA-256 hash — raw token is sent via email only.
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+/// Password history prevention engine (last 5 passwords)
+model PasswordHistory {
+  id           String   @id @default(uuid())
+  userId       String
+  passwordHash String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// Dynamic enterprise OAuth authentication provider configuration
+model AuthProviderConfig {
+  id                 String   @id @default(uuid())
+  provider           String   @unique // GOOGLE, MICROSOFT, APPLE, GITHUB, FACEBOOK, LINKEDIN
+  isEnabled          Boolean  @default(true)
+  clientId           String?
+  clientSecret       String?
+  redirectUri        String?
+  callbackUrl        String?
+  scopes             String   @default("[]") // JSON array of requested scopes
+  additionalSettings String   @default("{}") // JSON settings (branding, domain restrictions)
+  tenantId           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+/// Email & Mobile SMS OTP verification tokens
+model VerificationToken {
+  id         String   @id @default(uuid())
+  identifier String // Email address or Phone number
+  token      String // OTP or hash
+  type       String // EMAIL_VERIFICATION, MOBILE_OTP, INVITATION
+  attempts   Int      @default(0)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([identifier, type])
+}
+
+model ProviderAccount {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model MfaSecret {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  secret    String
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Role-Based Access Control (RBAC)
+// -----------------------------------------------------------------------------
+
+model Role {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+
+  isSystem Boolean @default(false) // e.g., "Super Admin" can't be deleted
+
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  permissions RolePermission[]
+  users       UserRole[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([name, tenantId]) // Role names must be unique within a tenant
+  @@index([tenantId])
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  resource    String // e.g., "users", "posts", "billing"
+  action      String // e.g., "create", "read", "update", "delete", "manage", "approve", "export"
+  category    String? @default("GENERAL") // e.g., "MODULE", "MENU", "API", "WORKFLOW", "REPORT"
+  scope       String? @default("TENANT") // e.g., "OWN", "DEPARTMENT", "TENANT", "GLOBAL"
+  description String?
+
+  roles RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+// -----------------------------------------------------------------------------
+// Dynamic Feature Flags & Entitlements
+// -----------------------------------------------------------------------------
+
+model FeatureFlag {
+  id          String  @id @default(uuid())
+  key         String  @unique // e.g., "AI_STUDIO", "GBP_AUTOMATION", "ADVANCED_ANALYTICS"
+  name        String
+  description String?
+  isEnabled   Boolean @default(true)
+
+  // Rule-based Targeting (JSON string format: { tenants: [], plans: [], roles: [] })
+  targetRules String @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Approval Workflows Subsystem
+// -----------------------------------------------------------------------------
+
+model ApprovalWorkflow {
+  id          String  @id @default(uuid())
+  name        String // e.g., "Partner Registration Approval", "Social Content Publishing"
+  triggerType String // e.g., "REGISTRATION", "PARTNER_ONBOARDING", "POST_PUBLISH", "BILLING_REFUND"
+  description String?
+  isActive    Boolean @default(true)
+  tenantId    String?
+
+  steps    ApprovalStep[]
+  requests ApprovalRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model ApprovalStep {
+  id           String           @id @default(uuid())
+  workflowId   String
+  workflow     ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepNumber   Int
+  title        String
+  requiredRole String // Role required to approve e.g. "PARTNER_ADMIN", "SUPER_ADMIN"
+
+  createdAt DateTime @default(now())
+
+  @@index([workflowId])
+}
+
+model ApprovalRequest {
+  id           String           @id @default(uuid())
+  workflowId   String
+  workflow     ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  requesterId  String
+  resourceType String // e.g., "User", "SocialPost", "Client"
+  resourceId   String
+  currentStep  Int              @default(1)
+  status       String           @default("PENDING") // PENDING, APPROVED, REJECTED
+  comments     String?
+  tenantId     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workflowId])
+  @@index([tenantId])
+  @@index([status])
+}
+
+// -----------------------------------------------------------------------------
+// Enterprise White-Label & Custom Branding
+// -----------------------------------------------------------------------------
+
+model WhiteLabelConfig {
+  id             String   @id @default(uuid())
+  tenantId       String?  @unique
+  appTitle       String   @default("Global Business Suite")
+  logoUrl        String?
+  faviconUrl     String?
+  primaryColor   String   @default("#D4AF37")
+  secondaryColor String   @default("#1A1A1A")
+  themeMode      String   @default("DARK") // DARK, LIGHT, SYSTEM
+  customCss      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// AI Prompt Templates & Versioning Studio
+// -----------------------------------------------------------------------------
+
+model PromptTemplate {
+  id               String   @id @default(uuid())
+  key              String   @unique // e.g., "CAPTION_GENERATOR", "REVIEW_REPLY", "EMAIL_ASSISTANT"
+  title            String
+  category         String   @default("GENERAL") // MARKETING, SEO, CRM, SALES, SUPPORT, GBP, SOCIAL, ANALYTICS, BILLING, REVIEW, KNOWLEDGE, WORKFLOW, GENERAL
+  systemPrompt     String
+  userPrompt       String
+  variablesJson    String   @default("[]") // JSON array of variables: [{ name, label, defaultValue, required }]
+  version          Int      @default(1)
+  modelKey         String   @default("gemini-1.5-pro")
+  approvalStatus   String   @default("APPROVED") // DRAFT, PENDING_APPROVAL, APPROVED, REJECTED
+  approvedByUserId String?
+  tenantId         String? // Nullable for global platform system prompts
+  tagsJson         String   @default("[]")
+  usageCount       Int      @default(0)
+  ratingAvg        Float    @default(5.0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([category])
+  @@index([approvalStatus])
+}
+
+// -----------------------------------------------------------------------------
+// Notification Templates Control Center
+// -----------------------------------------------------------------------------
+
+model NotificationTemplate {
+  id        String   @id @default(uuid())
+  key       String   @unique // e.g., "WELCOME_EMAIL", "PASSWORD_RESET", "SUSPICIOUS_LOGIN"
+  channel   String   @default("EMAIL") // EMAIL, SMS, WHATSAPP, PUSH
+  subject   String
+  body      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Platform Settings
+// -----------------------------------------------------------------------------
+
+model PlatformSetting {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Partner Portal specific models
+// -----------------------------------------------------------------------------
+
+model Client {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+  status    String   @default("ACTIVE") // ACTIVE, INACTIVE, LEAD
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Social post — supports multi-platform cross-posting, post types, approval workflows, UTM builder & AI metadata
+model SocialPost {
+  id        String  @id @default(uuid())
+  content   String
+  /// Legacy single-platform field kept for backward compat
+  platform  String  @default("MULTI")
+  /// JSON array of platform keys: ["FACEBOOK","INSTAGRAM","LINKEDIN",...]
+  platforms String  @default("[]")
+  imageUrls String  @default("[]") // JSON array of image URLs
+  videoUrl  String?
+  hashtags  String  @default("[]") // JSON array
+  linkUrl   String?
+
+  // Phase 11 Extensions
+  postType         String  @default("POST") // POST, REEL, STORY, SHORT, CAROUSEL, POLL, EVENT, OFFER, ANNOUNCEMENT, DOCUMENT
+  utmParamsJson    String  @default("{}") // UTM builder params: { source, medium, campaign, term, content }
+  aiPromptUsed     String?
+  brandVoice       String?
+  approvalStatus   String  @default("APPROVED") // DRAFT, PENDING, APPROVED, REJECTED
+  approvedByUserId String?
+  rejectionReason  String?
+  version          Int     @default(1)
+  isRecurring      Boolean @default(false)
+  recurrenceRule   String? // DAILY, WEEKLY, MONTHLY
+
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
+  status          String                     @default("DRAFT") // DRAFT, PENDING_APPROVAL, SCHEDULED, PUBLISHING, PUBLISHED, FAILED, PARTIALLY_PUBLISHED
+  createdByUserId String?
+  tenantId        String
+  tenant          Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  platformResults SocialPostPlatformResult[]
+  postVersions    SocialPostVersion[]
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([approvalStatus])
+}
+
+/// Version history for Social Post drafts and edits
+model SocialPostVersion {
+  id             String     @id @default(uuid())
+  postId         String
+  post           SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  versionNumber  Int
+  content        String
+  platforms      String     @default("[]")
+  imageUrls      String     @default("[]")
+  videoUrl       String?
+  editedByUserId String?
+  createdAt      DateTime   @default(now())
+
+  @@index([postId])
+}
+
+/// Per-channel publish result for a SocialPost
+model SocialPostPlatformResult {
+  id             String     @id @default(uuid())
+  postId         String
+  post           SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  platform       String // FACEBOOK, INSTAGRAM, LINKEDIN, etc.
+  channelId      String? // Foreign key to SocialChannel
+  status         String     @default("PENDING") // PENDING, PUBLISHED, FAILED
+  externalPostId String? // ID returned by platform after publish
+  externalUrl    String? // Link to the post on the platform
+  error          String? // Error message if failed
+  publishedAt    DateTime?
+  createdAt      DateTime   @default(now())
+
+  @@index([postId])
+}
+
+/// OAuth-connected social media channel per tenant
+model SocialChannel {
+  id             String    @id @default(uuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  platform       String // FACEBOOK, INSTAGRAM, LINKEDIN, PINTEREST, TIKTOK, THREADS, TWITTER_X, YOUTUBE, GOOGLE_BUSINESS, REDDIT, TELEGRAM, WHATSAPP, SNAPCHAT
+  accountId      String // Platform-specific account/page ID
+  accountName    String
+  accountAvatar  String?
+  accessToken    String
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  scopes         String    @default("[]") // JSON array of granted scopes
+  isActive       Boolean   @default(true)
+
+  // Phase 11 Workspace & Health Extensions
+  workspaceId       String?
+  locationId        String?
+  pageId            String?
+  healthStatus      String    @default("HEALTHY") // HEALTHY, EXPIRING, EXPIRED, REVOKED
+  lastHealthCheckAt DateTime?
+
+  metadata  String   @default("{}") // Platform-specific extra data (JSON)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, platform, accountId])
+  @@index([tenantId])
+}
+
+// -----------------------------------------------------------------------------
+// Phase 11 Media Library, Unified Engagement Inbox, Social Listening & Analytics
+// -----------------------------------------------------------------------------
+
+/// Folder structure for Media Library
+model MediaFolder {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/// Enhanced Enterprise Social Media Asset
+model SocialMediaAsset {
+  id            String   @id @default(uuid())
+  tenantId      String
+  name          String
+  fileUrl       String
+  fileType      String // IMAGE, VIDEO, DOCUMENT, BRAND_ASSET, AI_GENERATED
+  fileSize      Int      @default(0)
+  mimeType      String?
+  folderId      String?
+  category      String   @default("GENERAL")
+  tagsJson      String   @default("[]")
+  isBrandAsset  Boolean  @default(false)
+  isAiGenerated Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([fileType])
+  @@index([folderId])
+}
+
+/// Centralized Social Media Engagement Conversation Inbox
+model SocialEngagementInbox {
+  id              String          @id @default(uuid())
+  tenantId        String
+  platform        String // FACEBOOK, INSTAGRAM, LINKEDIN, TWITTER_X, WHATSAPP, GOOGLE_BUSINESS
+  channelId       String?
+  conversationId  String          @unique // External conversation/thread ID
+  senderName      String?
+  senderAvatar    String?
+  senderId        String?
+  lastMessageText String?
+  unreadCount     Int             @default(0)
+  status          String          @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  assignedUserId  String?
+  messages        SocialMessage[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+/// Messages in Unified Engagement Inbox
+model SocialMessage {
+  id                String                @id @default(uuid())
+  inboxId           String
+  inbox             SocialEngagementInbox @relation(fields: [inboxId], references: [id], onDelete: Cascade)
+  externalMessageId String?               @unique
+  senderId          String?
+  senderName        String?
+  messageText       String
+  mediaUrl          String?
+  isFromCustomer    Boolean               @default(true)
+  aiSuggestedReply  String?
+  createdAt         DateTime              @default(now())
+
+  @@index([inboxId])
+}
+
+/// Comment threads across connected social accounts
+model SocialComment {
+  id                String    @id @default(uuid())
+  tenantId          String
+  platform          String
+  channelId         String?
+  postId            String? // External or internal post ID
+  externalCommentId String?   @unique
+  authorName        String?
+  authorAvatar      String?
+  content           String
+  sentiment         Float? // -1.0 to +1.0
+  status            String    @default("UNREAD") // UNREAD, READ, REPLIED, HIDDEN, DELETED
+  assignedUserId    String?
+  replyText         String?
+  repliedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+/// Social Listening Rule Monitor
+model SocialListeningMonitor {
+  id              String             @id @default(uuid())
+  tenantId        String
+  name            String
+  keywordsJson    String             @default("[]") // Brand keywords to track
+  competitorsJson String             @default("[]") // Competitor handles to track
+  isActive        Boolean            @default(true)
+  lastRunAt       DateTime?
+  mentions        SocialMention[]
+  competitors     SocialCompetitor[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([tenantId])
+}
+
+/// Social Listening Brand Mention & Trend Post
+model SocialMention {
+  id             String                 @id @default(uuid())
+  monitorId      String
+  monitor        SocialListeningMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  tenantId       String
+  platform       String // TWITTER_X, REDDIT, LINKEDIN, INSTAGRAM, WEB
+  externalId     String?                @unique
+  authorName     String?
+  content        String
+  url            String?
+  sentimentScore Float? // Negative (-1) to Positive (+1)
+  publishedAt    DateTime?
+  createdAt      DateTime               @default(now())
+
+  @@index([monitorId])
+  @@index([tenantId])
+}
+
+/// Social Listening Competitor Tracker
+model SocialCompetitor {
+  id             String                 @id @default(uuid())
+  monitorId      String
+  monitor        SocialListeningMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  tenantId       String
+  competitorName String
+  platform       String
+  handle         String
+  followersCount Int                    @default(0)
+  engagementRate Float                  @default(0.0)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([monitorId])
+  @@index([tenantId])
+}
+
+/// Social Analytics Periodic Rollup Snapshot
+model SocialAnalyticsSnapshot {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  platform           String
+  channelId          String?
+  date               DateTime
+  reach              Int      @default(0)
+  impressions        Int      @default(0)
+  engagement         Int      @default(0)
+  followers          Int      @default(0)
+  clicks             Int      @default(0)
+  conversions        Int      @default(0)
+  bestTimeToPostJson String   @default("[]") // Peak engagement hours JSON array e.g. [9, 14, 18]
+  createdAt          DateTime @default(now())
+
+  @@unique([tenantId, platform, date])
+  @@index([tenantId])
+}
+
+model AiContent {
+  id        String   @id @default(uuid())
+  prompt    String
+  result    String
+  type      String   @default("CAPTION") // CAPTION, EMAIL, BLOG, REVIEW_REPLY, GBP_POST, SOCIAL_POST
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// -----------------------------------------------------------------------------
+// Google Business Profile (GBP) Extended Models
+// -----------------------------------------------------------------------------
+
+/// Multi-account Google OAuth connection per tenant
+model GbpAccount {
+  id                 String     @id @default(uuid())
+  tenantId           String
+  accountName        String
+  googleAccountId    String     @unique // e.g. accounts/10923847291
+  email              String
+  accessToken        String
+  refreshToken       String?
+  tokenExpiresAt     DateTime?
+  accountHealth      String     @default("HEALTHY") // HEALTHY, EXPIRING, EXPIRED, REVOKED, DISCONNECTED
+  verificationStatus String     @default("VERIFIED") // VERIFIED, PENDING, UNVERIFIED
+  permissionLevel    String     @default("OWNER") // OWNER, MANAGER, SITE_MANAGER
+  lastHealthCheckAt  DateTime?
+  locations          Location[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@index([tenantId])
+}
+
+/// Location Group for multi-location enterprises
+model GbpLocationGroup {
+  id          String     @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  locations   Location[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([tenantId])
+}
+
+/// GBP-specific posts (offers, events, what's new, COVID-19 updates)
+model GbpPost {
+  id                  String    @id @default(uuid())
+  locationId          String
+  location            Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  topicType           String    @default("STANDARD") // STANDARD, EVENT, OFFER, ALERT, PRODUCT, SERVICE
+  covidType           String? // COVID_19_UPDATE, TEMPORARY_CLOSURE
+  summary             String
+  callToAction        String? // BOOK, ORDER, SHOP, LEARN_MORE, SIGN_UP, CALL
+  callToActionUrl     String?
+  photoUrl            String?
+  videoUrl            String?
+  eventTitle          String?
+  eventStartDate      DateTime?
+  eventEndDate        DateTime?
+  couponCode          String?
+  redeemOnlineUrl     String?
+  termsConditions     String?
+  googlePostId        String?   @unique // ID returned by GBP API after publish
+  status              String    @default("DRAFT") // DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, SCHEDULED, PUBLISHED, DELETED
+  approvalStatus      String    @default("APPROVED") // PENDING, APPROVED, REJECTED
+  approvedByUserId    String?
+  isRecurring         Boolean   @default(false)
+  recurrenceRule      String? // DAILY, WEEKLY, MONTHLY
+  templateId          String?
+  aiSuggestedHashtags String    @default("[]")
+  aiSuggestedImages   String    @default("[]")
+  targetLocationIds   String    @default("[]") // For bulk posting across multiple locations
+  scheduledAt         DateTime?
+  publishedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([locationId])
+  @@index([status])
+  @@index([approvalStatus])
+}
+
+/// Product catalog for a GBP location
+model GbpProduct {
+  id           String   @id @default(uuid())
+  locationId   String
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name         String
+  category     String?  @default("GENERAL")
+  description  String?
+  price        Float?
+  currency     String   @default("USD")
+  imageUrl     String?
+  landingPage  String?
+  offerCode    String?
+  inStock      Boolean  @default(true)
+  googleItemId String?  @unique
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([locationId])
+}
+
+/// Services offered at a GBP location
+model GbpService {
+  id           String   @id @default(uuid())
+  locationId   String
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  price        Float?
+  currency     String   @default("USD")
+  durationMins Int?     @default(30)
+  categoryId   String? // GBP service category ID
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([locationId])
+}
+
+/// Photos and videos for a GBP location
+model GbpMedia {
+  id            String   @id @default(uuid())
+  locationId    String
+  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  mediaFormat   String   @default("PHOTO") // PHOTO, VIDEO
+  category      String   @default("ADDITIONAL") // LOGO, COVER, EXTERIOR, INTERIOR, PRODUCT, AT_WORK, FOOD_AND_DRINK, MENU, ADDITIONAL
+  googleMediaId String?  @unique
+  sourceUrl     String // URL of the media (hosted or GBP-served)
+  thumbnailUrl  String?
+  description   String?
+  isAiSuggested Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([locationId])
+}
+
+/// Customer questions for a GBP location (Q&A)
+model GbpQuestion {
+  id                String      @id @default(uuid())
+  locationId        String
+  location          Location    @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  googleQuestionId  String?     @unique
+  authorName        String?
+  text              String
+  upvoteCount       Int         @default(0)
+  aiSuggestedAnswer String?
+  assignedUserId    String?
+  status            String      @default("UNANSWERED") // UNANSWERED, ANSWERED, AI_SUGGESTED
+  createTime        DateTime?
+  updateTime        DateTime?
+  answers           GbpAnswer[]
+  createdAt         DateTime    @default(now())
+
+  @@index([locationId])
+}
+
+/// Answers to a GBP Q&A question (owner or top answer)
+model GbpAnswer {
+  id             String      @id @default(uuid())
+  questionId     String
+  question       GbpQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  googleAnswerId String?     @unique
+  authorName     String?
+  isOwnerAnswer  Boolean     @default(false)
+  text           String
+  upvoteCount    Int         @default(0)
+  createTime     DateTime?
+  createdAt      DateTime    @default(now())
+
+  @@index([questionId])
+}
+
+/// Daily GBP insights snapshot per location
+model GbpInsight {
+  id                  String   @id @default(uuid())
+  locationId          String
+  location            Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  date                DateTime
+  // Impressions
+  businessImpressions Int      @default(0)
+  searchKeywordCount  Int      @default(0)
+  // Interactions
+  callClicks          Int      @default(0)
+  websiteClicks       Int      @default(0)
+  directionRequests   Int      @default(0)
+  bookingClicks       Int      @default(0)
+  foodOrderClicks     Int      @default(0)
+  // Photos
+  photoViewCount      Int      @default(0)
+  // Reviews
+  reviewCount         Int      @default(0)
+  averageRating       Float?
+  createdAt           DateTime @default(now())
+
+  @@unique([locationId, date])
+  @@index([locationId])
+}
+
+/// Customer messages via GBP Messaging API
+model GbpMessage {
+  id               String    @id @default(uuid())
+  locationId       String
+  location         Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  googleMessageId  String?   @unique
+  customerName     String?
+  customerPhone    String?
+  messageText      String
+  isRead           Boolean   @default(false)
+  aiSuggestedReply String?
+  assignedUserId   String?
+  replyText        String?
+  repliedAt        DateTime?
+  repliedByUserId  String?
+  createTime       DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([locationId])
+}
+
+/// GBP Post Template for reuse
+model GbpPostTemplate {
+  id              String   @id @default(uuid())
+  tenantId        String
+  title           String
+  topicType       String   @default("STANDARD")
+  summary         String
+  callToAction    String?
+  callToActionUrl String?
+  mediaUrlsJson   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/// GBP Review Reply Template for AI / Manual reuse
+model GbpReviewReplyTemplate {
+  id           String   @id @default(uuid())
+  tenantId     String
+  name         String
+  starRating   Int      @default(5)
+  tone         String   @default("professional")
+  language     String   @default("en")
+  templateText String
+  brandVoice   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// -----------------------------------------------------------------------------
+// Automation Engine
+// -----------------------------------------------------------------------------
+
+model AutomationRule {
+  id                String    @id @default(uuid())
+  tenantId          String
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  isActive          Boolean   @default(true)
+  triggerType       String
+  triggerConditions String    @default("{}")
+  actionType        String
+  actionConfig      String    @default("{}")
+  lastRunAt         DateTime?
+  runCount          Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+// -----------------------------------------------------------------------------
+// AI Engine Configuration
+// -----------------------------------------------------------------------------
+
+model AiProvider {
+  id                      String    @id @default(uuid())
+  name                    String
+  providerKey             String    @unique
+  apiType                 String    @default("OPENAI")
+  baseUrl                 String?
+  organizationId          String?
+  apiKey                  String?
+  priority                Int       @default(1)
+  isFallback              Boolean   @default(false)
+  isActive                Boolean   @default(true)
+  isSelfHosted            Boolean   @default(false)
+  healthStatus            String    @default("HEALTHY")
+  lastHealthCheckAt       DateTime?
+  supportedModalitiesJson String    @default("[\"TEXT\"]")
+  rateLimitRpm            Int       @default(600)
+  rateLimitTpm            Int       @default(100000)
+  costMultiplier          Float     @default(1.0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  models        AiModel[]
+  tenantConfigs TenantAiConfig[]
+}
+
+model AiModel {
+  id                      String     @id @default(uuid())
+  providerId              String
+  provider                AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  modelKey                String
+  name                    String
+  description             String?
+  contextWindow           Int        @default(128000)
+  maxOutputTokens         Int        @default(4096)
+  inputCostPer1k          Float      @default(0.0015)
+  outputCostPer1k         Float      @default(0.0050)
+  supportsStreaming       Boolean    @default(true)
+  supportsVision          Boolean    @default(true)
+  supportsAudio           Boolean    @default(false)
+  supportsEmbeddings      Boolean    @default(false)
+  supportsFunctionCalling Boolean    @default(true)
+  latencyBenchmarkMs      Int        @default(350)
+  qualityScore            Float      @default(9.5)
+  isDefault               Boolean    @default(false)
+  isActive                Boolean    @default(true)
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @default(now()) @updatedAt
+
+  @@unique([providerId, modelKey])
+}
+
+model TenantAiConfig {
+  id              String     @id @default(uuid())
+  tenantId        String
+  tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  providerId      String
+  provider        AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  isActive        Boolean    @default(true)
+  quotaMonthly    Int        @default(0)
+  usageCurrent    Int        @default(0)
+  overrideKey     String?
+  overrideBaseUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, providerId])
+}
+
+// -----------------------------------------------------------------------------
+// Billing & Subscriptions
+// -----------------------------------------------------------------------------
+
+model Plan {
+  id              String  @id @default(uuid())
+  name            String
+  code            String? @unique
+  description     String?
+  price           Float
+  interval        String  @default("MONTHLY")
+  currency        String  @default("USD")
+  trialDays       Int     @default(14)
+  isActive        Boolean @default(true)
+  isCustomPricing Boolean @default(false)
+
+  featuresJson         String @default("[]")
+  limitsJson           String @default("{}")
+  pricingByCountryJson String @default("{}")
+
+  // Granular Subscription Limits (-1 represents unlimited)
+  maxCustomers              Int @default(-1)
+  maxEmployees              Int @default(-1)
+  maxOrganizations          Int @default(-1)
+  maxGoogleAccounts         Int @default(-1)
+  maxGoogleBusinessProfiles Int @default(-1)
+  maxLocations              Int @default(-1)
+  maxSocialAccounts         Int @default(-1)
+  maxAiUsage                Int @default(-1)
+  maxStorageMb              Int @default(-1)
+  maxWhatsAppMessages       Int @default(-1)
+  maxSms                    Int @default(-1)
+  maxEmails                 Int @default(-1)
+  maxCampaigns              Int @default(-1)
+  maxPosts                  Int @default(-1)
+  maxReviewReplies          Int @default(-1)
+  maxCalls                  Int @default(-1)
+  maxAppointments           Int @default(-1)
+  maxInboxConversations     Int @default(-1)
+
+  // Module level View vs Action permissions JSON map: { "reviews": ["view"], "gbp": ["view", "edit"], "analytics": ["view"] }
+  allowedActionsJson String @default("{}")
+
+  subscriptions Subscription[]
+  allowedModels String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RegistrationConfig {
+  id                           String   @id @default(uuid())
+  portal                       String   @unique // ADMIN, PARTNER, CUSTOMER
+  allowRegistration            Boolean  @default(true)
+  emailVerificationRequired    Boolean  @default(true)
+  mobileOtpRequired            Boolean  @default(true)
+  whatsAppOtpEnabled           Boolean  @default(false)
+  documentUploadRequired       Boolean  @default(false)
+  businessVerificationRequired Boolean  @default(false)
+  autoApprovalEnabled          Boolean  @default(false)
+  defaultPlanId                String?
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+}
+
+model PartnerVerificationDocument {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName     String
+  documentType     String // BUSINESS_LICENSE, TAX_CERTIFICATE, IDENTITY_PROOF, UTILITY_BILL
+  documentUrl      String
+  status           String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  rejectionReason  String?
+  verifiedByUserId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model UpgradeRequest {
+  id                  String    @id @default(uuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId            String?
+  currentPlanId       String?
+  requestedPlanId     String
+  requestedLimitsJson String    @default("{}")
+  reason              String?
+  status              String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  adminNotes          String?
+  paymentTxId         String?
+  activatedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Subscription {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId   String
+  plan     Plan   @relation(fields: [planId], references: [id])
+  status   String @default("ACTIVE")
+
+  billingCycle       String    @default("MONTHLY")
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  trialStart         DateTime?
+  trialEnd           DateTime?
+  pausedAt           DateTime?
+  resumedAt          DateTime?
+  gracePeriodEnd     DateTime?
+  canceledAt         DateTime?
+  cancelAtPeriodEnd  Boolean   @default(false)
+  autoRenew          Boolean   @default(true)
+
+  pricingOverrideJson  String?
+  savedPaymentMethodId String?
+
+  addons   SubscriptionAddon[]
+  invoices Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model SubscriptionAddon {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  addonKey       String
+  addonName      String
+  quantity       Int          @default(1)
+  unitPrice      Float
+  currency       String       @default("USD")
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  @@index([subscriptionId])
+}
+
+model EnterpriseLicense {
+  id                  String              @id @default(uuid())
+  tenantId            String?
+  licenseKeyHash      String              @unique
+  licenseKeyMasked    String
+  licenseType         String              @default("ENTERPRISE")
+  status              String              @default("ACTIVE")
+  maxSeats            Int                 @default(1)
+  allocatedSeats      Int                 @default(0)
+  maxDevices          Int                 @default(1)
+  maxApiCallsDay      Int                 @default(100000)
+  allowedFeaturesJson String              @default("[]")
+  metadataJson        String              @default("{}")
+  validFrom           DateTime            @default(now())
+  validTo             DateTime?
+  revokedAt           DateTime?
+  revokedReason       String?
+  activations         LicenseActivation[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([tenantId])
+  @@index([licenseKeyHash])
+  @@index([status])
+}
+
+model LicenseActivation {
+  id            String            @id @default(uuid())
+  licenseId     String
+  license       EnterpriseLicense @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  activatedBy   String?
+  deviceId      String?
+  deviceName    String?
+  ipAddress     String?
+  osInfo        String?
+  isActive      Boolean           @default(true)
+  activatedAt   DateTime          @default(now())
+  deactivatedAt DateTime?
+
+  @@index([licenseId])
+  @@index([activatedBy])
+}
+
+model PaymentGatewayConfig {
+  id                      String   @id @default(uuid())
+  gateway                 String   @unique
+  name                    String
+  isEnabled               Boolean  @default(false)
+  isDefault               Boolean  @default(false)
+  testMode                Boolean  @default(true)
+  credentialsJson         String   @default("{}")
+  supportedCurrenciesJson String   @default("[\"USD\"]")
+  priority                Int      @default(1)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model SavedPaymentMethod {
+  id           String   @id @default(uuid())
+  tenantId     String
+  userId       String?
+  gateway      String
+  gatewayToken String
+  paymentType  String   @default("CARD")
+  cardBrand    String?
+  last4        String?
+  expMonth     Int?
+  expYear      Int?
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  invoiceNumber  String        @unique
+  docType        String        @default("INVOICE")
+  status         String        @default("OPEN")
+
+  subtotal      Float  @default(0.0)
+  taxTotal      Float  @default(0.0)
+  discountTotal Float  @default(0.0)
+  amount        Float
+  currency      String @default("USD")
+
+  billingAddressJson String  @default("{}")
+  taxBreakdownJson   String  @default("[]")
+  pdfUrl             String?
+
+  dueDate DateTime?
+  paidAt  DateTime?
+
+  lineItems InvoiceLineItem[]
+  payments  Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([invoiceNumber])
+}
+
+model InvoiceLineItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  itemType    String   @default("SUBSCRIPTION")
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Float
+  amount      Float
+  taxRate     Float    @default(0.0)
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id             String   @id @default(uuid())
+  invoiceId      String
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount         Float
+  currency       String   @default("USD")
+  gateway        String   @default("STRIPE")
+  paymentType    String   @default("RECURRING")
+  status         String   @default("SUCCEEDED")
+  referenceId    String?
+  gatewayFee     Float    @default(0.0)
+  failureReason  String?
+  idempotencyKey String?  @unique
+  retryCount     Int      @default(0)
+  refunds        Refund[]
+
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([status])
+}
+
+model Refund {
+  id          String   @id @default(uuid())
+  paymentId   String
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount      Float
+  currency    String   @default("USD")
+  reason      String?
+  status      String   @default("SUCCEEDED")
+  referenceId String?
+  createdAt   DateTime @default(now())
+
+  @@index([paymentId])
+}
+
+model TaxRule {
+  id           String   @id @default(uuid())
+  countryCode  String
+  stateRegion  String?
+  taxName      String
+  taxRate      Float
+  isExemptable Boolean  @default(true)
+  description  String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([countryCode, stateRegion, taxName])
+}
+
+model TaxExemption {
+  id            String    @id @default(uuid())
+  tenantId      String
+  countryCode   String
+  taxName       String
+  certificateNo String
+  status        String    @default("APPROVED")
+  validUntil    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId])
+}
+
+model CouponRedemption {
+  id          String   @id @default(uuid())
+  couponId    String
+  tenantId    String
+  invoiceId   String?
+  discountAmt Float
+  redeemedAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([couponId])
+}
+
+model UsageRecord {
+  id          String   @id @default(uuid())
+  tenantId    String
+  metricKey   String
+  quantity    Int      @default(1)
+  unitPrice   Float    @default(0.0)
+  totalAmount Float    @default(0.0)
+  periodStart DateTime
+  periodEnd   DateTime
+  isBilled    Boolean  @default(false)
+  invoiceId   String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([metricKey])
+  @@index([isBilled])
+}
+
+model PaymentWebhookLog {
+  id          String   @id @default(uuid())
+  gateway     String
+  eventId     String   @unique
+  eventType   String
+  payloadJson String
+  status      String   @default("PROCESSED")
+  processedAt DateTime @default(now())
+
+  @@index([gateway])
+  @@index([eventId])
+}
+
+// -----------------------------------------------------------------------------
+// Support & Tickets
+// -----------------------------------------------------------------------------
+
+model Ticket {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subject  String
+  status   String @default("OPEN")
+  priority String @default("MEDIUM")
+
+  messages TicketMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model TicketMessage {
+  id         String  @id @default(uuid())
+  ticketId   String
+  ticket     Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId   String
+  content    String
+  isInternal Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+model KnowledgeBase {
+  id          String  @id @default(uuid())
+  title       String
+  content     String
+  category    String?
+  isPublished Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// System & Analytics Logs
+// -----------------------------------------------------------------------------
+
+model AuditLog {
+  id         String  @id @default(uuid())
+  tenantId   String?
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  details    String?
+  ipAddress  String?
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model SystemLog {
+  id      String  @id @default(uuid())
+  level   String
+  service String
+  message String
+  meta    String?
+
+  createdAt DateTime @default(now())
+}
+
+model LoginHistory {
+  id            String  @id @default(uuid())
+  userId        String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress     String?
+  userAgent     String?
+  isSuccess     Boolean @default(true)
+  failureReason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// App Management & Mobile Devices
+// -----------------------------------------------------------------------------
+
+model AppRelease {
+  id           String   @id @default(uuid())
+  appType      String
+  platform     String
+  version      String
+  buildNumber  Int
+  isMandatory  Boolean  @default(false)
+  releaseNotes String?
+  status       String   @default("BETA")
+  downloadUrl  String?
+  apkChecksum  String?
+  minimumOs    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([appType, platform, status])
+}
+
+model Device {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName   String?
+  manufacturer String?
+  model        String?
+  osVersion    String?
+  appVersion   String?
+  ipAddress    String?
+  country      String?
+  city         String?
+  pushToken    String?
+  isJailbroken Boolean  @default(false)
+  lastLogin    DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Google Business Profile Integrations
+// -----------------------------------------------------------------------------
+
+model Location {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  googleAccountId String?
+  googleAccount   GbpAccount? @relation(fields: [googleAccountId], references: [id], onDelete: SetNull)
+
+  locationGroupId String?
+  locationGroup   GbpLocationGroup? @relation(fields: [locationGroupId], references: [id], onDelete: SetNull)
+
+  googleLocationId    String  @unique // The unique location name/ID from Google API
+  locationName        String?
+  title               String? // Business title on Google Maps
+  description         String? // Business description
+  storeCode           String?
+  primaryPhone        String?
+  secondaryPhonesJson String  @default("[]")
+  email               String?
+  websiteUrl          String?
+  appointmentUrl      String?
+  menuUrl             String?
+  bookingUrl          String?
+  deliveryUrl         String?
+  address             String? // Formatted address
+
+  // Categories & Attributes
+  categoriesJson String @default("[]") // Main and additional categories
+  attributesJson String @default("{}") // GBP business attributes
+
+  // Hours
+  regularHoursJson String @default("{}") // Monday-Sunday opening hours
+  specialHoursJson String @default("[]") // Special dates opening hours
+  holidayHoursJson String @default("[]") // Public holiday hours
+
+  // Media
+  logoUrl       String?
+  coverPhotoUrl String?
+
+  // Verification & Account Health
+  verificationStatus String @default("VERIFIED") // VERIFIED, UNVERIFIED, PENDING
+  permissionLevel    String @default("OWNER") // OWNER, MANAGER
+  accountHealth      String @default("HEALTHY") // HEALTHY, WARNING, SUSPENDED
+
+  // Settings & Sync status
+  isSyncEnabled Boolean   @default(true)
+  lastSyncAt    DateTime?
+
+  reviews      Review[]
+  gbpPosts     GbpPost[]
+  gbpProducts  GbpProduct[]
+  gbpServices  GbpService[]
+  gbpMedia     GbpMedia[]
+  gbpQuestions GbpQuestion[]
+  gbpInsights  GbpInsight[]
+  gbpMessages  GbpMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([googleAccountId])
+  @@index([locationGroupId])
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  tenantId   String?
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  googleReviewId          String    @unique // The review ID from Google API
+  reviewerName            String?
+  reviewerProfilePhotoUrl String?
+  starRating              Int       @default(0) // STAR_RATING_UNSPECIFIED, ONE, TWO, THREE, FOUR, FIVE mapped to 0-5
+  comment                 String?
+  createTime              DateTime?
+  updateTime              DateTime?
+
+  // Categorization & Tags
+  category       String? @default("GENERAL")
+  tagsJson       String  @default("[]")
+  assignedUserId String?
+
+  // Reply & Moderation
+  replyComment     String?
+  replyUpdateTime  DateTime?
+  moderationStatus String    @default("APPROVED") // PENDING, APPROVED, REJECTED, AUTO_REPLIED
+  replyStatus      String    @default("UNREPLIED") // UNREPLIED, PENDING_APPROVAL, REPLIED, FAILED
+  replyTone        String?   @default("professional")
+  replyLanguage    String?   @default("en")
+  replyHistoryJson String    @default("[]")
+
+  // AI/Sentiment
+  sentimentScore   Float?
+  aiSuggestedReply String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([locationId])
+  @@index([starRating])
+  @@index([tenantId])
+  @@index([moderationStatus])
+}
+
+// -----------------------------------------------------------------------------
+// Phase 4 Enterprise Hierarchy & Organization Structure
+// -----------------------------------------------------------------------------
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  tenantId    String?
+  description String?
+  branches    Branch[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Branch {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  code           String
+  address        String?
+  departments    Department[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, code])
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  name      String
+  teams     Team[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Team {
+  id           String     @id @default(uuid())
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  name         String
+  leaderId     String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model UserGroup {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  membersJson String   @default("[]") // Array of user IDs
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Advanced Billing, Pricing Tiers, Coupons & Add-ons
+// -----------------------------------------------------------------------------
+
+model Coupon {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  discountType   String    @default("PERCENTAGE") // PERCENTAGE, FIXED_AMOUNT
+  discountValue  Float
+  maxRedemptions Int?
+  timesRedeemed  Int       @default(0)
+  validUntil     DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model BillingAddon {
+  id          String   @id @default(uuid())
+  name        String
+  key         String   @unique
+  price       Float
+  billingUnit String   @default("MONTHLY")
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// CRM, Sales, Marketing & Customer Success Subsystem (Phase 13)
+// -----------------------------------------------------------------------------
+
+/// Enterprise Lead record
+model CrmLead {
+  id                       String    @id @default(uuid())
+  tenantId                 String
+  source                   String    @default("WEBSITE_FORM") // WEBSITE_FORM, LANDING_PAGE, SOCIAL_MEDIA, GOOGLE_BUSINESS, MANUAL, API, IMPORT
+  status                   String    @default("NEW") // NEW, CONTACTED, QUALIFIED, UNQUALIFIED, CONVERTED, NURTURING, LOST
+  score                    Int       @default(0) // AI calculated lead score 0-100
+  aiInsights               String?
+  firstName                String
+  lastName                 String?
+  email                    String
+  phone                    String?
+  companyName              String?
+  jobTitle                 String?
+  industry                 String?
+  address                  String?
+  city                     String?
+  state                    String?
+  country                  String?
+  assignedUserId           String?
+  partnerId                String?
+  tagsJson                 String    @default("[]")
+  customFieldsJson         String    @default("{}")
+  isDuplicate              Boolean   @default(false)
+  duplicateOfLeadId        String?
+  qualificationNotes       String?
+  convertedToContactId     String?
+  convertedToOpportunityId String?
+  convertedAt              DateTime?
+  isDeleted                Boolean   @default(false)
+  deletedAt                DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([email])
+  @@index([score])
+}
+
+/// Automatic Lead Routing Rule
+model CrmLeadRoutingRule {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  name                String
+  ruleType            String   @default("ROUND_ROBIN") // ROUND_ROBIN, TERRITORY, SOURCE, LOAD_BALANCED
+  conditionsJson      String   @default("{}")
+  assignedUserIdsJson String   @default("[]")
+  priority            Int      @default(1)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/// AI Lead Scoring Rule
+model CrmLeadScoringRule {
+  id            String   @id @default(uuid())
+  tenantId      String
+  name          String
+  criteriaType  String   @default("DEMOGRAPHIC") // DEMOGRAPHIC, BEHAVIORAL, ENGAGEMENT, FIRMOGRAPHIC
+  conditionJson String   @default("{}")
+  scoreDelta    Int      @default(10)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/// Lead Capture Website/Landing Form Config
+model CrmLeadCaptureForm {
+  id                   String   @id @default(uuid())
+  tenantId             String
+  title                String
+  description          String?
+  fieldsJson           String   @default("[]")
+  embedCode            String?
+  targetLandingPageUrl String?
+  redirectUrl          String?
+  submissionCount      Int      @default(0)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/// B2B Organization / Client Account
+model CrmAccount {
+  id              String           @id @default(uuid())
+  tenantId        String
+  name            String
+  accountType     String           @default("PROSPECT") // PROSPECT, CUSTOMER, PARTNER, VENDOR
+  industry        String?
+  website         String?
+  phone           String?
+  email           String?
+  annualRevenue   Float            @default(0)
+  employeeCount   Int              @default(0)
+  parentAccountId String?
+  branchId        String?
+  billingAddress  String?
+  shippingAddress String?
+  healthScore     Int              @default(100) // 0-100
+  assignedUserId  String?
+  tagsJson        String           @default("[]")
+  segmentsJson    String           @default("[]")
+  isDeleted       Boolean          @default(false)
+  deletedAt       DateTime?
+  contacts        CrmContact[]
+  opportunities   CrmOpportunity[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@index([accountType])
+}
+
+/// Individual Contact Person
+model CrmContact {
+  id                           String           @id @default(uuid())
+  tenantId                     String
+  accountId                    String?
+  account                      CrmAccount?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  firstName                    String
+  lastName                     String?
+  email                        String
+  phone                        String?
+  mobilePhone                  String?
+  designation                  String?
+  communicationPreferencesJson String           @default("{\"email\":true,\"sms\":true,\"whatsapp\":true,\"push\":true}")
+  relationshipsJson            String           @default("[]")
+  tagsJson                     String           @default("[]")
+  segmentsJson                 String           @default("[]")
+  assignedUserId               String?
+  isDeleted                    Boolean          @default(false)
+  deletedAt                    DateTime?
+  opportunities                CrmOpportunity[]
+  createdAt                    DateTime         @default(now())
+  updatedAt                    DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@index([accountId])
+  @@index([email])
+}
+
+/// CRM Sales Pipeline
+model CrmPipeline {
+  id          String     @id @default(uuid())
+  tenantId    String?
+  name        String
+  description String?
+  isDefault   Boolean    @default(false)
+  isDeleted   Boolean    @default(false)
+  stages      CrmStage[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([tenantId])
+}
+
+/// CRM Sales Stage
+model CrmStage {
+  id             String           @id @default(uuid())
+  pipelineId     String
+  pipeline       CrmPipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name           String
+  order          Int              @default(0)
+  winProbability Int              @default(50)
+  isWonStage     Boolean          @default(false)
+  isLostStage    Boolean          @default(false)
+  opportunities  CrmOpportunity[]
+  createdAt      DateTime         @default(now())
+
+  @@index([pipelineId])
+}
+
+/// CRM Deal Opportunity
+model CrmOpportunity {
+  id                 String        @id @default(uuid())
+  tenantId           String?
+  stageId            String
+  stage              CrmStage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  accountId          String?
+  account            CrmAccount?   @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  contactId          String?
+  contact            CrmContact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  leadId             String?
+  title              String
+  companyName        String?
+  contactName        String?
+  contactEmail       String?
+  value              Float         @default(0)
+  probability        Int           @default(50)
+  status             String        @default("OPEN") // OPEN, WON, LOST
+  expectedCloseDate  DateTime?
+  closedAt           DateTime?
+  winLossReason      String?
+  winLossCategory    String?
+  competitorName     String?
+  aiScore            Int           @default(50)
+  aiDealInsightsJson String        @default("{}")
+  assignedToId       String?
+  partnerId          String?
+  isDeleted          Boolean       @default(false)
+  activities         CrmActivity[]
+  documents          CrmDocument[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([stageId])
+  @@index([tenantId])
+  @@index([status])
+}
+
+/// CRM Activity & Communication Log
+model CrmActivity {
+  id            String          @id @default(uuid())
+  tenantId      String?
+  opportunityId String?
+  opportunity   CrmOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  leadId        String?
+  accountId     String?
+  contactId     String?
+  type          String          @default("NOTE") // NOTE, CALL, EMAIL, MEETING, TASK, WHATSAPP, SMS, APPOINTMENT
+  subject       String
+  details       String?
+  outcome       String?
+  durationMins  Int             @default(15)
+  scheduledAt   DateTime?
+  completedAt   DateTime?
+  remindersJson String          @default("[]")
+  location      String?
+  meetingUrl    String?
+  performedBy   String?
+  createdAt     DateTime        @default(now())
+
+  @@index([opportunityId])
+  @@index([tenantId])
+  @@index([leadId])
+}
+
+/// Marketing Audience Segment
+model MarketingAudienceSegment {
+  id           String   @id @default(uuid())
+  tenantId     String
+  name         String
+  description  String?
+  criteriaJson String   @default("{}")
+  memberCount  Int      @default(0)
+  isDynamic    Boolean  @default(true)
+  tagsJson     String   @default("[]")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/// Marketing Journey Automation Builder Flow
+model MarketingJourney {
+  id              String   @id @default(uuid())
+  tenantId        String
+  name            String
+  description     String?
+  status          String   @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED
+  triggerType     String   @default("LEAD_CREATED") // LEAD_CREATED, OPPORTUNITY_STAGE_CHANGED, SCORE_THRESHOLD, FORM_SUBMITTED, MANUAL
+  nodesJson       String   @default("[]")
+  edgesJson       String   @default("[]")
+  entryCount      Int      @default(0)
+  completionCount Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+/// A/B Testing Variant for Marketing Campaigns
+model MarketingCampaignAbVariant {
+  id              String            @id @default(uuid())
+  campaignId      String
+  campaign        MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  variantName     String
+  subject         String?
+  content         String
+  percentageSplit Int               @default(50)
+  opens           Int               @default(0)
+  clicks          Int               @default(0)
+  conversions     Int               @default(0)
+  createdAt       DateTime          @default(now())
+
+  @@index([campaignId])
+}
+
+/// Customer Health Score Matrix
+model CustomerHealthScore {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  accountId          String?
+  clientId           String?
+  overallScore       Int      @default(100) // 0-100
+  scoreCategory      String   @default("HEALTHY") // HEALTHY, NEUTRAL, AT_RISK, CRITICAL
+  npsScore           Float?
+  csatScore          Float?
+  usageActivityScore Int      @default(100)
+  supportTicketScore Int      @default(100)
+  billingScore       Int      @default(100)
+  aiChurnRiskScore   Float    @default(0.0) // 0 to 100%
+  aiChurnReason      String?
+  metricsJson        String   @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([scoreCategory])
+}
+
+/// Customer Success Onboarding & Goal Plan
+model CustomerSuccessPlan {
+  id                   String    @id @default(uuid())
+  tenantId             String
+  accountId            String?
+  clientId             String?
+  title                String
+  status               String    @default("DRAFT") // DRAFT, ACTIVE, COMPLETED, ON_HOLD
+  targetCompletionDate DateTime?
+  milestonesJson       String    @default("[]")
+  assignedUserId       String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+/// Customer Feedback (NPS & CSAT)
+model CustomerFeedback {
+  id                String   @id @default(uuid())
+  tenantId          String
+  accountId         String?
+  clientId          String?
+  type              String   @default("NPS") // NPS, CSAT, GENERAL, EXIT
+  rating            Int      @default(10) // 1-10 for NPS or 1-5 for CSAT
+  comments          String?
+  category          String?  @default("PRODUCT") // PRODUCT, SUPPORT, BILLING, ONBOARDING
+  followUpStatus    String   @default("UNTOUCHED") // UNTOUCHED, IN_PROGRESS, RESOLVED
+  respondedByUserId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([type])
+}
+
+/// Customer Renewal & Expansion Pipeline
+model CustomerRenewalUpsell {
+  id            String    @id @default(uuid())
+  tenantId      String
+  accountId     String?
+  clientId      String?
+  opportunityId String?
+  type          String    @default("RENEWAL") // RENEWAL, UPSELL, CROSS_SELL
+  currentMrr    Float     @default(0)
+  targetMrr     Float     @default(0)
+  probability   Int       @default(50)
+  targetDate    DateTime?
+  status        String    @default("IDENTIFIED") // IDENTIFIED, IN_PROGRESS, WON, LOST
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([status])
+}
+
+/// CRM Document, Quotes, Contracts & Proposals
+model CrmDocument {
+  id                       String          @id @default(uuid())
+  tenantId                 String
+  opportunityId            String?
+  opportunity              CrmOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  leadId                   String?
+  accountId                String?
+  contactId                String?
+  name                     String
+  docType                  String          @default("QUOTE") // QUOTE, CONTRACT, AGREEMENT, PROPOSAL, ATTACHMENT, TEMPLATE
+  fileUrl                  String
+  fileSize                 Int             @default(0)
+  status                   String          @default("DRAFT") // DRAFT, SENT, VIEWED, ACCEPTED, SIGNED, REJECTED, EXPIRED
+  totalAmount              Float           @default(0)
+  validUntil               DateTime?
+  digitalSignatureDataJson String          @default("{}")
+  version                  Int             @default(1)
+  createdByUserId          String?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+
+  @@index([tenantId])
+  @@index([docType])
+  @@index([status])
+}
+
+// -----------------------------------------------------------------------------
+// API Gateway Keys & Webhook Subscriptions
+// -----------------------------------------------------------------------------
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  tenantId   String?
+  name       String
+  keyHash    String    @unique
+  prefix     String
+  scopesJson String    @default("[\"*\"]")
+  rateLimit  Int       @default(1000) // requests per hour
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([tenantId])
+}
+
+model WebhookSubscription {
+  id            String    @id @default(uuid())
+  tenantId      String?
+  targetUrl     String
+  secret        String
+  eventsJson    String    @default("[\"*\"]")
+  isActive      Boolean   @default(true)
+  failureCount  Int       @default(0)
+  lastTriggerAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId])
+}
+
+// -----------------------------------------------------------------------------
+// Media Storage & Backups Engine
+// -----------------------------------------------------------------------------
+
+model StorageBucket {
+  id            String   @id @default(uuid())
+  provider      String   @default("LOCAL") // LOCAL, S3, GCS, AZURE
+  bucketName    String   @unique
+  region        String?
+  maxStorageGb  Int      @default(100)
+  usedStorageMb Float    @default(0)
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BackupLog {
+  id            String   @id @default(uuid())
+  type          String   @default("FULL") // FULL, INCREMENTAL
+  status        String   @default("COMPLETED") // PENDING, COMPLETED, FAILED
+  fileSizeBytes Float?
+  backupPath    String?
+  checksum      String?
+  createdAt     DateTime @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// Search Bookmarks & Dashboard Dynamic Preferences
+// -----------------------------------------------------------------------------
+
+model SavedSearch {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  query       String
+  filtersJson String   @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model DashboardLayout {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  layoutJson String   @default("[]") // Array of active widget IDs & positions
+  updatedAt  DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Phase 5 Enterprise Partner Portal Subsystems
+// -----------------------------------------------------------------------------
+
+model MarketingCampaign {
+  id              String                       @id @default(uuid())
+  name            String
+  type            String                       @default("EMAIL") // EMAIL, SMS, WHATSAPP, PUSH, OMNICHANNEL
+  channel         String                       @default("EMAIL")
+  status          String                       @default("DRAFT") // DRAFT, SCHEDULED, ACTIVE, COMPLETED, PAUSED
+  audienceSegment String                       @default("ALL")
+  content         String
+  subject         String?
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  metricsJson     String                       @default("{}") // { sent: 0, opened: 0, clicked: 0, converted: 0 }
+  tenantId        String
+  abVariants      MarketingCampaignAbVariant[]
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model CalendarEvent {
+  id             String   @id @default(uuid())
+  title          String
+  description    String?
+  eventType      String   @default("MEETING") // MEETING, APPOINTMENT, TASK, REMINDER, EVENT
+  startTime      DateTime
+  endTime        DateTime
+  isRecurring    Boolean  @default(false)
+  recurrenceRule String? // DAILY, WEEKLY, MONTHLY
+  location       String?
+  attendeesJson  String   @default("[]")
+  assignedUserId String?
+  tenantId       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([startTime])
+}
+
+model TaskItem {
+  id             String    @id @default(uuid())
+  title          String
+  description    String?
+  status         String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+  priority       String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate        DateTime?
+  assignedUserId String?
+  tenantId       String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model MediaAsset {
+  id        String   @id @default(uuid())
+  name      String
+  fileUrl   String
+  fileType  String // IMAGE, VIDEO, DOCUMENT, MARKETING_ASSET, AI_GENERATED
+  fileSize  Int      @default(0)
+  category  String   @default("GENERAL")
+  tagsJson  String   @default("[]")
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([fileType])
+}
+
+model ScheduledReport {
+  id             String    @id @default(uuid())
+  title          String
+  reportType     String // BUSINESS, REVENUE, LEADS, GBP, SOCIAL, AI, MARKETING, REVIEWS, SEO, PRODUCTIVITY
+  frequency      String    @default("WEEKLY") // DAILY, WEEKLY, MONTHLY
+  recipientsJson String    @default("[]") // Array of email addresses
+  format         String    @default("PDF") // PDF, CSV, JSON
+  lastRunAt      DateTime?
+  isActive       Boolean   @default(true)
+  tenantId       String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tenantId])
+}
+
+// -----------------------------------------------------------------------------
+// Phase 6 Enterprise Customer Portal Subsystems
+// -----------------------------------------------------------------------------
+
+model CustomerOrder {
+  id             String   @id @default(uuid())
+  orderNumber    String   @unique
+  status         String   @default("PROCESSING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUNDED
+  itemsJson      String   @default("[]")
+  total          Float    @default(0)
+  currency       String   @default("USD")
+  paymentStatus  String   @default("PAID") // UNPAID, PAID, REFUNDED
+  trackingNumber String?
+  notes          String?
+  tenantId       String
+  clientId       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([clientId])
+}
+
+model CustomerAppointment {
+  id              String   @id @default(uuid())
+  title           String
+  serviceId       String?
+  appointmentTime DateTime
+  durationMins    Int      @default(30)
+  status          String   @default("BOOKED") // BOOKED, CONFIRMED, CANCELLED, COMPLETED
+  meetingLink     String?
+  notes           String?
+  tenantId        String
+  clientId        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([clientId])
+}
+
+model CustomerQuotation {
+  id          String    @id @default(uuid())
+  quoteNumber String    @unique
+  totalAmount Float     @default(0)
+  status      String    @default("SENT") // DRAFT, SENT, ACCEPTED, REJECTED
+  validUntil  DateTime?
+  pdfUrl      String?
+  tenantId    String
+  clientId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([clientId])
+}
+
+model CustomerInvoice {
+  id            String    @id @default(uuid())
+  invoiceNumber String    @unique
+  amount        Float     @default(0)
+  status        String    @default("UNPAID") // DRAFT, UNPAID, PAID, OVERDUE, CANCELLED
+  dueDate       DateTime?
+  paidAt        DateTime?
+  pdfUrl        String?
+  tenantId      String
+  clientId      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([clientId])
+}
+
+model CustomerLoyalty {
+  id             String   @id @default(uuid())
+  clientId       String   @unique
+  pointsBalance  Int      @default(0)
+  tier           String   @default("BRONZE") // BRONZE, SILVER, GOLD, PLATINUM
+  lifetimeEarned Int      @default(0)
+  tenantId       String
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model CustomerDocument {
+  id        String   @id @default(uuid())
+  name      String
+  docType   String   @default("DOCUMENT") // INVOICE, RECEIPT, CONTRACT, AGREEMENT, REPORT, USER_UPLOAD
+  fileUrl   String
+  fileSize  Int      @default(0)
+  sharedBy  String   @default("SYSTEM") // SYSTEM, PARTNER, CUSTOMER
+  tenantId  String
+  clientId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([clientId])
+}
+
+// -----------------------------------------------------------------------------
+// Phase 9 Master Data Lookup Subsystems
+// -----------------------------------------------------------------------------
+
+model Country {
+  id           String   @id @default(uuid())
+  code         String   @unique // ISO 3166-1 alpha-2 e.g. "US", "IN", "GB"
+  name         String
+  phoneCode    String // e.g. "+1", "+91"
+  currencyCode String // e.g. "USD", "INR"
+  isActive     Boolean  @default(true)
+  states       State[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model State {
+  id        String   @id @default(uuid())
+  countryId String
+  country   Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  code      String // e.g. "CA", "NY", "MH"
+  name      String
+  cities    City[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([countryId, code])
+  @@index([countryId])
+}
+
+model City {
+  id        String   @id @default(uuid())
+  stateId   String
+  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stateId])
+}
+
+model Currency {
+  id           String   @id @default(uuid())
+  code         String   @unique // e.g. "USD", "EUR", "INR", "GBP"
+  name         String
+  symbol       String   @default("$")
+  exchangeRate Float    @default(1.0) // Rate relative to USD baseline
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Language {
+  id         String   @id @default(uuid())
+  code       String   @unique // ISO 639-1 e.g. "en", "es", "fr", "hi"
+  name       String
+  nativeName String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model TaxRate {
+  id          String   @id @default(uuid())
+  name        String // e.g. "GST Standard", "State Sales Tax"
+  percentage  Float
+  countryCode String   @default("US")
+  isCompound  Boolean  @default(false)
+  tenantId    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model BusinessCategory {
+  id          String   @id @default(uuid())
+  key         String   @unique // e.g. "RETAIL", "HEALTHCARE", "REST_BAR", "SALON_SPA"
+  name        String
+  description String?
+  industry    String   @default("GENERAL")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Phase 9 In-App User Notifications Subsystem
+// -----------------------------------------------------------------------------
+
+model Notification {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId     String?
+  type         String    @default("INFO") // INFO, SUCCESS, WARNING, ALERT, SYSTEM
+  title        String
+  body         String
+  isRead       Boolean   @default(false)
+  readAt       DateTime?
+  actionUrl    String?
+  metadataJson String    @default("{}")
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([tenantId])
+}
+
+model AiEmbedding {
+  id           String   @id @default(uuid())
+  tenantId     String?
+  resourceType String // KnowledgeBase, Review, SocialPost, Client, Product
+  resourceId   String
+  vectorJson   String // JSON string of float embedding vector
+  contentHash  String // SHA-256 string for cache invalidation
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([resourceType, resourceId])
+  @@index([tenantId])
+}
+
+// -----------------------------------------------------------------------------
+// Phase 9 Enterprise Audit & Field Delta Change History
+// -----------------------------------------------------------------------------
+
+model AuditChangeLog {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  userId      String?
+  entityType  String // User, Subscription, Location, Plan, SocialPost, Invoice
+  entityId    String
+  action      String // CREATE, UPDATE, DELETE, RESTORE
+  changesJson String // JSON diff { field: { old: val, new: val } }
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// PHASE 12 – ENTERPRISE AI PLATFORM, AI AGENTS & AUTOMATION
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// AI Agents Catalog & Configuration
+// -----------------------------------------------------------------------------
+
+model AiAgent {
+  id                   String   @id @default(uuid())
+  key                  String   @unique // MARKETING_AGENT, SEO_AGENT, CRM_AGENT, SUPPORT_AGENT, etc.
+  name                 String
+  description          String?
+  agentType            String   @default("GENERAL") // MARKETING, SEO, CRM, SALES, SUPPORT, GBP, SOCIAL, ANALYTICS, BILLING, REVIEW, KNOWLEDGE, WORKFLOW, ADMIN, PARTNER, CUSTOMER, DEVELOPER
+  systemPrompt         String
+  defaultModelKey      String   @default("gemini-1.5-pro")
+  providerKey          String   @default("gemini")
+  temperature          Float    @default(0.7)
+  maxTokens            Int      @default(2048)
+  toolsJson            String   @default("[]") // JSON array of tool names the agent can call
+  knowledgeBaseIdsJson String   @default("[]") // JSON array of bound knowledge base IDs
+  tenantId             String? // null = global platform agent
+  isActive             Boolean  @default(true)
+  isSystemAgent        Boolean  @default(true) // Platform defaults vs custom tenant agents
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  executions AiAgentExecution[]
+
+  @@index([tenantId])
+  @@index([agentType])
+  @@index([isActive])
+}
+
+model AiAgentExecution {
+  id                String   @id @default(uuid())
+  agentId           String
+  agent             AiAgent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tenantId          String?
+  userId            String?
+  userPrompt        String
+  systemInstruction String
+  response          String
+  providerKey       String
+  modelKey          String
+  promptTokens      Int      @default(0)
+  completionTokens  Int      @default(0)
+  totalTokens       Int      @default(0)
+  estimatedCost     Float    @default(0.0)
+  latencyMs         Int      @default(0)
+  citationsJson     String   @default("[]")
+  status            String   @default("SUCCESS") // SUCCESS, ERROR, GOVERNANCE_BLOCKED
+  createdAt         DateTime @default(now())
+
+  @@index([agentId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// AI Workflow Automation Engine
+// -----------------------------------------------------------------------------
+
+model AiWorkflow {
+  id                String    @id @default(uuid())
+  tenantId          String?
+  name              String
+  description       String?
+  triggerType       String    @default("MANUAL") // SCHEDULED, EVENT, WEBHOOK, MANUAL
+  triggerConfigJson String    @default("{}") // cron expression, event name, webhook URL
+  stepsJson         String    @default("[]") // JSON array of pipeline steps
+  isActive          Boolean   @default(true)
+  runCount          Int       @default(0)
+  lastRunAt         DateTime?
+  lastRunStatus     String? // SUCCESS, ERROR, RUNNING
+  createdByUserId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  runs AiWorkflowRun[]
+
+  @@index([tenantId])
+  @@index([triggerType])
+  @@index([isActive])
+}
+
+model AiWorkflowRun {
+  id           String     @id @default(uuid())
+  workflowId   String
+  workflow     AiWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  tenantId     String?
+  triggeredBy  String     @default("SYSTEM") // SYSTEM, USER, WEBHOOK, CRON
+  status       String     @default("RUNNING") // RUNNING, SUCCESS, FAILED, CANCELLED
+  inputJson    String     @default("{}")
+  outputJson   String     @default("{}")
+  errorMessage String?
+  durationMs   Int?
+  createdAt    DateTime   @default(now())
+  completedAt  DateTime?
+
+  @@index([workflowId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// AI Knowledge Base & RAG Vector Document Store
+// -----------------------------------------------------------------------------
+
+model AiKnowledgeBase {
+  id            String   @id @default(uuid())
+  tenantId      String?
+  name          String
+  description   String?
+  category      String   @default("GENERAL") // SUPPORT, PRODUCT, POLICY, TRAINING, GENERAL
+  isActive      Boolean  @default(true)
+  documentCount Int      @default(0)
+  chunkCount    Int      @default(0)
+  embeddingDim  Int      @default(64) // Embedding vector dimension
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  documents AiDocument[]
+
+  @@index([tenantId])
+  @@index([category])
+}
+
+model AiDocument {
+  id              String          @id @default(uuid())
+  knowledgeBaseId String
+  knowledgeBase   AiKnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  tenantId        String?
+  title           String
+  fileUrl         String
+  fileType        String          @default("TXT") // PDF, DOCX, EXCEL, CSV, PPTX, IMAGE, WEB_PAGE, TXT
+  fileSize        Int             @default(0)
+  status          String          @default("PENDING") // PENDING, PROCESSING, INDEXED, FAILED
+  chunkCount      Int             @default(0)
+  errorMessage    String?
+  metadataJson    String          @default("{}")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  chunks AiDocumentChunk[]
+
+  @@index([knowledgeBaseId])
+  @@index([tenantId])
+  @@index([status])
+}
+
+model AiDocumentChunk {
+  id           String     @id @default(uuid())
+  documentId   String
+  document     AiDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tenantId     String?
+  chunkIndex   Int
+  content      String
+  tokenCount   Int        @default(0)
+  vectorJson   String // JSON array of float embeddings (normalized 64-dim)
+  metadataJson String     @default("{}")
+  createdAt    DateTime   @default(now())
+
+  @@index([documentId])
+  @@index([tenantId])
+  @@index([documentId, chunkIndex])
+}
+
+// -----------------------------------------------------------------------------
+// AI Governance, Safety, PII & Budget Control
+// -----------------------------------------------------------------------------
+
+model AiGovernancePolicy {
+  id                    String   @id @default(uuid())
+  tenantId              String? // null = global platform policy
+  name                  String
+  description           String?
+  policyType            String   @default("CONTENT_SAFETY") // CONTENT_SAFETY, PII_MASKING, RATE_LIMIT, BUDGET_CAP, PROMPT_AUDIT
+  isActive              Boolean  @default(true)
+  rulesJson             String   @default("{}") // Policy-specific configuration JSON
+  budgetCapUSD          Float? // Monthly budget cap in USD
+  rateLimitRpm          Int? // Rate limit: requests per minute
+  rateLimitTpm          Int? // Rate limit: tokens per minute
+  forbiddenKeywordsJson String   @default("[]")
+  piiPatternsJson       String   @default("[]")
+  severityLevel         String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  auditLogs AiGovernanceAuditLog[]
+
+  @@index([tenantId])
+  @@index([policyType])
+  @@index([isActive])
+}
+
+model AiGovernanceAuditLog {
+  id            String             @id @default(uuid())
+  policyId      String
+  policy        AiGovernancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  tenantId      String?
+  userId        String?
+  eventType     String // PII_DETECTED, UNSAFE_PROMPT, RATE_LIMIT_HIT, BUDGET_EXCEEDED
+  severity      String             @default("MEDIUM")
+  detailsJson   String             @default("{}")
+  promptSnippet String?
+  wasBlocked    Boolean            @default(false)
+  createdAt     DateTime           @default(now())
+
+  @@index([policyId])
+  @@index([tenantId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// Enhanced AI Usage Log (Phase 12 – Agent/Workflow/Cost Tracking)
+// -----------------------------------------------------------------------------
+
+model AiUsageLog {
+  id                String   @id @default(uuid())
+  tenantId          String?
+  userId            String?
+  agentId           String? // Which AI Agent handled this request
+  workflowId        String? // Which AI Workflow triggered this request
+  providerKey       String // openai, anthropic, gemini, cursor
+  modelKey          String // gpt-4o, gemini-1.5-pro, claude-3-5-sonnet
+  promptTokens      Int      @default(0)
+  completionTokens  Int      @default(0)
+  totalTokens       Int      @default(0)
+  estimatedCost     Float    @default(0.0)
+  latencyMs         Int      @default(0)
+  status            String   @default("SUCCESS") // SUCCESS, ERROR, QUOTA_EXCEEDED, GOVERNANCE_BLOCKED
+  errorMessage      String?
+  feedbackRating    Int? // 1-5 star user satisfaction rating
+  isFailoverUsed    Boolean  @default(false)
+  governanceFlagged Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([agentId])
+  @@index([workflowId])
+  @@index([providerKey, modelKey])
+  @@index([createdAt])
+  @@index([status])
+}
+
+// =============================================================================
+// PHASE 15 – ENTERPRISE ANALYTICS, BUSINESS INTELLIGENCE & REPORTING
+// =============================================================================
+
+/// Report Definition for Visual Report Builder
+model ReportDefinition {
+  id                String   @id @default(uuid())
+  tenantId          String?
+  key               String?  @unique
+  title             String
+  description       String?
+  category          String   @default("GENERAL") // USERS, PARTNERS, CUSTOMERS, ORGANIZATIONS, SUBSCRIPTIONS, REVENUE, INVOICES, PAYMENTS, CRM, LEADS, SALES, MARKETING, GBP, SOCIAL, REVIEWS, APPOINTMENTS, SUPPORT, AI, NOTIFICATIONS, AUTOMATION, API, SECURITY, AUDIT, PERFORMANCE, MOBILE
+  reportType        String   @default("TABLE") // TABLE, CHART, PIVOT, MATRIX, HEATMAP, KPI_CARD, FUNNEL, GEOMAP, TIMELINE, CUSTOM_SQL
+  chartType         String?  @default("BAR") // BAR, LINE, PIE, AREA, SCATTER, DONUT, RADAR, GAUGE
+  sqlQuery          String? // Admin-only custom SQL query string
+  queryConfigJson   String   @default("{}") // Visual query configuration JSON (dimensions, measures, filters, sort)
+  filtersJson       String   @default("[]") // Default report filter conditions
+  columnsJson       String   @default("[]") // Visible table/matrix columns
+  vizConfigJson     String   @default("{}") // Chart colors, axes, legend, formatting config
+  isSystemReport    Boolean  @default(false)
+  isPublic          Boolean  @default(false)
+  ownerUserId       String?
+  sharedRoleIdsJson String   @default("[]")
+  tagsJson          String   @default("[]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  executions ReportExecutionLog[]
+
+  @@index([tenantId])
+  @@index([category])
+  @@index([reportType])
+}
+
+/// Audit history log for report queries and exports
+model ReportExecutionLog {
+  id            String           @id @default(uuid())
+  reportId      String
+  report        ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  tenantId      String?
+  executedBy    String?
+  executionType String           @default("MANUAL") // MANUAL, SCHEDULED, EXPORT, API
+  exportFormat  String?          @default("JSON") // JSON, PDF, EXCEL, CSV, PRINT
+  durationMs    Int              @default(0)
+  rowCount      Int              @default(0)
+  status        String           @default("SUCCESS") // SUCCESS, ERROR, CANCELLED
+  errorMessage  String?
+  createdAt     DateTime         @default(now())
+
+  @@index([reportId])
+  @@index([tenantId])
+  @@index([executedBy])
+  @@index([createdAt])
+}
+
+/// Configurable KPI Definition
+model KpiDefinition {
+  id                String   @id @default(uuid())
+  tenantId          String?
+  key               String   @unique // REVENUE_MRR, REVENUE_ARR, CHURN_RATE, LTV, ARPU, LEAD_CONVERSION, GBP_RATING, CSAT, NPS, API_SLA, etc.
+  name              String
+  description       String?
+  category          String   @default("FINANCIAL") // FINANCIAL, CRM, MARKETING, GBP, SOCIAL, AI, SYSTEM, CUSTOMER_SUCCESS, SUPPORT, SECURITY
+  metricType        String   @default("CURRENCY") // CURRENCY, PERCENTAGE, COUNT, DURATION, SCORE, RATIO
+  unit              String?  @default("USD")
+  queryConfigJson   String   @default("{}")
+  targetValue       Float?
+  warningThreshold  Float?
+  criticalThreshold Float?
+  trendPeriodDays   Int      @default(30)
+  isSystem          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  history KpiHistory[]
+
+  @@index([tenantId])
+  @@index([category])
+}
+
+/// Periodic snapshot history for KPI trends and predictive modeling
+model KpiHistory {
+  id          String        @id @default(uuid())
+  kpiId       String
+  kpi         KpiDefinition @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  tenantId    String?
+  value       Float
+  targetValue Float?
+  status      String        @default("HEALTHY") // HEALTHY, WARNING, CRITICAL
+  date        DateTime
+  createdAt   DateTime      @default(now())
+
+  @@index([kpiId])
+  @@index([tenantId])
+  @@index([date])
+}
+
+/// Threshold Alert Rules for Business Intelligence
+model BIAlertRule {
+  id                        String    @id @default(uuid())
+  tenantId                  String?
+  name                      String
+  metricKey                 String // REVENUE_DROP, NEGATIVE_REVIEWS, AI_COST_LIMIT, API_FAILURES, PAYMENT_FAILURES, STORAGE_THRESHOLD, SUBSCRIPTION_EXPIRY, CUSTOM_KPI
+  condition                 String    @default("GREATER_THAN") // GREATER_THAN, LESS_THAN, EQUALS, CHANGE_PERCENT
+  thresholdValue            Float
+  severity                  String    @default("HIGH") // LOW, MEDIUM, HIGH, CRITICAL
+  channelsJson              String    @default("[\"EMAIL\",\"IN_APP\"]") // EMAIL, WHATSAPP, IN_APP, PUSH
+  recipientRoleIdsJson      String    @default("[\"SUPER_ADMIN\",\"ADMIN\"]")
+  recipientEmailsJson       String    @default("[]")
+  recipientPhoneNumbersJson String    @default("[]")
+  isActive                  Boolean   @default(true)
+  lastTriggeredAt           DateTime?
+  triggerCount              Int       @default(0)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([metricKey])
+  @@index([isActive])
+}
+
+/// Configurable Dashboard Layout Container
+model DashboardDefinition {
+  id                 String   @id @default(uuid())
+  tenantId           String?
+  key                String // EXECUTIVE, SYSTEM, ADMIN, PARTNER, CUSTOMER, FINANCE, CRM, AI, GBP, SOCIAL, MARKETING, SALES, CUSTOMER_SUCCESS, SUPPORT, SECURITY, INFRASTRUCTURE, SCORECARD_OWNER, SCORECARD_PARTNER, SCORECARD_CUSTOMER
+  title              String
+  description        String?
+  dashboardType      String   @default("DOMAIN") // DOMAIN, SCORECARD, CUSTOM_USER
+  layoutJson         String   @default("[]") // Drag and drop grid layout coordinates [{ id, w, h, x, y, widgetKey }]
+  isSystem           Boolean  @default(true)
+  isDefault          Boolean  @default(false)
+  ownerUserId        String?
+  roleVisibilityJson String   @default("[]") // Allowed roles
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  widgets DashboardWidget[]
+
+  @@unique([key, tenantId, ownerUserId])
+  @@index([tenantId])
+  @@index([key])
+}
+
+/// Drag & Drop Dashboard Widget Component
+model DashboardWidget {
+  id                 String              @id @default(uuid())
+  dashboardId        String
+  dashboard          DashboardDefinition @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  widgetKey          String
+  title              String
+  widgetType         String              @default("METRIC_CARD") // METRIC_CARD, CHART, TABLE, FUNNEL, HEATMAP, SCORECARD, AI_INSIGHT, STREAM_LIVE
+  chartType          String?             @default("BAR")
+  dataEndpoint       String?
+  queryConfigJson    String              @default("{}")
+  refreshIntervalSec Int                 @default(300)
+  gridPositionJson   String              @default("{\"x\":0,\"y\":0,\"w\":4,\"h\":3}")
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([dashboardId])
+}
+
+/// Predictive Analytics Model Snapshots
+model PredictiveModelSnapshot {
+  id                      String   @id @default(uuid())
+  tenantId                String?
+  modelType               String // REVENUE_ARR, CHURN_RISK, CUSTOMER_GROWTH, REVIEW_RATING_TREND, MARKETING_ROI
+  forecastDays            Int      @default(30)
+  accuracyScore           Float    @default(0.92)
+  forecastDataJson        String   @default("[]") // [{ date, predictedValue, lowerBound, upperBound }]
+  confidenceInterval      Float    @default(0.95)
+  contributingFactorsJson String   @default("[]")
+  createdAt               DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([modelType])
+}
+
+/// Data warehouse and BI integration layer for external platforms (Power BI, Tableau, Looker, Grafana, Snowflake, BigQuery, Databricks)
+model BiIntegration {
+  id              String    @id @default(uuid())
+  tenantId        String?
+  name            String
+  platformType    String    @default("POWER_BI") // POWER_BI, TABLEAU, LOOKER, GRAFANA, SNOWFLAKE, BIGQUERY, DATABRICKS, POSTGRESQL_SYNC, REST_ODATA
+  connectionUrl   String?
+  apiKeyMasked    String?
+  databaseName    String?
+  syncFrequency   String    @default("HOURLY") // REALTIME, HOURLY, DAILY, MANUAL
+  lastSyncAt      DateTime?
+  status          String    @default("ACTIVE") // ACTIVE, INACTIVE, SYNCING, ERROR
+  recordsExported Int       @default(0)
+  syncConfigJson  String    @default("{}")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([platformType])
+}
+
+// =============================================================================
+// PHASE 16 – ENTERPRISE PLATFORM SERVICES, AUTOMATION & OPERATIONS
+// =============================================================================
+
+/// Centralized Multi-Channel Notification Log
+model CentralNotificationLog {
+  id              String    @id @default(uuid())
+  tenantId        String?
+  userId          String?
+  channel         String    @default("EMAIL") // EMAIL, SMS, WHATSAPP, PUSH, BROWSER, IN_APP, SLACK, TEAMS, TELEGRAM, DISCORD, WEBHOOK
+  recipient       String
+  title           String
+  body            String
+  status          String    @default("DELIVERED") // PENDING, DELIVERED, READ, FAILED, RETRYING
+  retryCount      Int       @default(0)
+  fallbackChannel String?
+  scheduledAt     DateTime?
+  readAt          DateTime?
+  metadataJson    String    @default("{}")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([channel])
+  @@index([status])
+}
+
+/// Visual Drag & Drop Workflow Definition
+model VisualWorkflowDefinition {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  key         String   @unique
+  name        String
+  description String?
+  triggerType String   @default("EVENT") // EVENT, SCHEDULED, MANUAL, AI, APPROVAL
+  nodesJson   String   @default("[]") // Array of Visual Flow Nodes
+  edgesJson   String   @default("[]") // Array of Visual Flow Edges
+  version     Int      @default(1)
+  isActive    Boolean  @default(true)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  executions VisualWorkflowExecution[]
+
+  @@index([tenantId])
+  @@index([triggerType])
+}
+
+/// Visual Workflow Execution Instance History
+model VisualWorkflowExecution {
+  id                String                   @id @default(uuid())
+  workflowId        String
+  workflow          VisualWorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  tenantId          String?
+  triggeredByUserId String?
+  status            String                   @default("COMPLETED") // RUNNING, COMPLETED, FAILED, WAITING_APPROVAL, CANCELLED
+  currentStepId     String?
+  executionLogJson  String                   @default("[]")
+  inputParamsJson   String                   @default("{}")
+  outputResultJson  String                   @default("{}")
+  durationMs        Int                      @default(0)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@index([workflowId])
+  @@index([tenantId])
+  @@index([status])
+}
+
+/// Centralized Background Job & Priority Queue Task Manager
+model BackgroundJobQueue {
+  id           String    @id @default(uuid())
+  tenantId     String?
+  queueName    String    @default("DEFAULT") // CRITICAL, HIGH, DEFAULT, LOW, DLQ
+  jobType      String // NOTIFICATION_DISPATCH, BULK_MARKETING, GBP_SYNC, REPORT_EXPORT, AI_BATCH, DATA_RETENTION_PURGE, BACKUP_TASK
+  payloadJson  String    @default("{}")
+  priority     Int       @default(10) // 1 (Highest) - 100 (Lowest)
+  status       String    @default("QUEUED") // QUEUED, PROCESSING, COMPLETED, FAILED, DLQ
+  retryCount   Int       @default(0)
+  maxRetries   Int       @default(3)
+  scheduledAt  DateTime  @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  failedAt     DateTime?
+  errorDetails String?
+  workerId     String?
+  createdAt    DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([queueName])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+/// Unified Domain & Application Event Log
+model DomainEventLog {
+  id            String   @id @default(uuid())
+  tenantId      String?
+  userId        String?
+  domain        String   @default("SYSTEM") // SYSTEM, NOTIFICATION, WORKFLOW, AUTOMATION, INTEGRATION, SECURITY, BACKUP, COMPLIANCE
+  eventType     String // e.g., "user.created", "workflow.completed", "security.threat_detected"
+  payloadJson   String   @default("{}")
+  correlationId String?
+  processedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([domain])
+  @@index([eventType])
+  @@index([correlationId])
+}
+
+/// Enterprise Connectors & SSO Integration Configuration
+model IntegrationConnectorConfig {
+  id              String    @id @default(uuid())
+  tenantId        String?
+  connectorKey    String // ZAPIER, MAKE_COM, POWER_AUTOMATE, ENTRA_ID, GOOGLE_WORKSPACE, GITHUB, GITLAB, M365, SLACK, TEAMS, TELEGRAM, DISCORD
+  name            String
+  connectorType   String    @default("WEBHOOK") // OAUTH2, SSO_SAML, SSO_LDAP, WEBHOOK, REST_API, GRAPHQL
+  isEnabled       Boolean   @default(true)
+  credentialsJson String    @default("{}") // Masked API keys, client secrets, endpoint URLs
+  settingsJson    String    @default("{}")
+  lastUsedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([connectorKey])
+}
+
+/// Security Operations & Threat Detection Log
+model SecurityThreatLog {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  userId      String?
+  ipAddress   String?
+  geoCountry  String?
+  threatType  String // SUSPICIOUS_LOGIN, BRUTE_FORCE, RATE_LIMIT_EXCEEDED, WAF_VIOLATION, UNAUTHORIZED_ROLE_SIMULATION
+  severity    String   @default("HIGH") // LOW, MEDIUM, HIGH, CRITICAL
+  wasBlocked  Boolean  @default(true)
+  detailsJson String   @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([threatType])
+  @@index([severity])
+  @@index([ipAddress])
+}
+
+/// Automated Backup, Disaster Recovery & Restore Testing Log
+model BackupRestoreLog {
+  id              String    @id @default(uuid())
+  tenantId        String? // null = platform full system backup
+  backupType      String    @default("FULL") // FULL, INCREMENTAL, PITR_SNAPSHOT, FILE_STORAGE
+  targetStorage   String    @default("S3_ENCRYPTED") // S3_ENCRYPTED, GCS_ENCRYPTED, AZURE_BLOB
+  status          String    @default("COMPLETED") // IN_PROGRESS, COMPLETED, FAILED, RESTORE_TEST_PASSED
+  sizeMb          Float     @default(128.5)
+  isEncrypted     Boolean   @default(true)
+  restoreTested   Boolean   @default(true)
+  restoreTestedAt DateTime?
+  runbookUrl      String?   @default("/docs/disaster_recovery_runbook.md")
+  checksumSha256  String?
+  createdAt       DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([backupType])
+  @@index([status])
+}
+
+/// Search Platform Index Metadata & Saved Searches
+model SearchIndexMetadata {
+  id             String   @id @default(uuid())
+  tenantId       String?
+  userId         String?
+  name           String
+  query          String
+  filtersJson    String   @default("{}")
+  isSavedSearch  Boolean  @default(true)
+  searchCount    Int      @default(1)
+  lastExecutedAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+}
+
+// =============================================================================
+// PHASE 18 – ENTERPRISE INNOVATION PLATFORM, ECOSYSTEM & FUTURE READINESS
+// =============================================================================
+
+/// Plugin & App Marketplace Store Item
+model PluginMarketplaceItem {
+  id                String   @id @default(uuid())
+  name              String
+  slug              String   @unique
+  category          String   @default("EXTENSION") // EXTENSION, APP, THEME, BRANDING, AI_PROMPT_PACK, AI_AGENT, WORKFLOW_TEMPLATE, DASHBOARD_TEMPLATE
+  description       String
+  longDescription   String?
+  version           String   @default("1.0.0")
+  author            String   @default("GBS Platform")
+  iconUrl           String?
+  bannerUrl         String?
+  priceType         String   @default("FREE") // FREE, PAID, FREEMIUM, SUBSCRIPTION, PRIVATE
+  priceMonthly      Float    @default(0.0)
+  currency          String   @default("USD")
+  permissionsJson   String   @default("[]") // Required RBAC & API permissions
+  dependenciesJson  String   @default("[]") // Dependent plugins/APIs
+  sandboxConfigJson String   @default("{}") // Security isolation sandbox policy
+  ratingAverage     Float    @default(5.0)
+  reviewCount       Int      @default(0)
+  downloadCount     Int      @default(0)
+  isVerified        Boolean  @default(true)
+  isPrivate         Boolean  @default(false)
+  tenantId          String? // Scoped to tenant if private
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  installations TenantPluginInstallation[]
+  reviews       PluginReview[]
+
+  @@index([category])
+  @@index([priceType])
+  @@index([isPrivate, tenantId])
+}
+
+/// Tenant Installed Plugin Instance
+model TenantPluginInstallation {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  pluginId           String
+  plugin             PluginMarketplaceItem @relation(fields: [pluginId], references: [id], onDelete: Cascade)
+  status             String                @default("INSTALLED") // INSTALLED, ACTIVE, DISABLED, UNINSTALLED
+  installedVersion   String                @default("1.0.0")
+  configSettingsJson String                @default("{}")
+  installedByUserId  String?
+  installedAt        DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@unique([tenantId, pluginId])
+  @@index([tenantId])
+  @@index([pluginId])
+  @@index([status])
+}
+
+/// Plugin Reviews & Ratings
+model PluginReview {
+  id        String                @id @default(uuid())
+  pluginId  String
+  plugin    PluginMarketplaceItem @relation(fields: [pluginId], references: [id], onDelete: Cascade)
+  tenantId  String?
+  userId    String?
+  rating    Int                   @default(5)
+  comment   String?
+  createdAt DateTime              @default(now())
+
+  @@index([pluginId])
+  @@index([tenantId])
+}
+
+/// Developer OAuth Apps & API Keys Engine
+model DeveloperApp {
+  id                String   @id @default(uuid())
+  tenantId          String
+  name              String
+  description       String?
+  clientId          String   @unique
+  clientSecretHash  String
+  apiKeyMasked      String?
+  redirectUrisJson  String   @default("[]")
+  scopesJson        String   @default("[\"read\"]")
+  rateLimitTier     String   @default("STANDARD") // BASIC, STANDARD, ENTERPRISE, UNLIMITED
+  isSandbox         Boolean  @default(false)
+  status            String   @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
+  requestCountTotal Int      @default(0)
+  createdByUserId   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  webhooks DeveloperWebhook[]
+
+  @@index([tenantId])
+  @@index([clientId])
+}
+
+/// Developer Portal Webhook Subscriptions
+model DeveloperWebhook {
+  id                   String       @id @default(uuid())
+  appId                String
+  app                  DeveloperApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+  tenantId             String
+  targetUrl            String
+  subscribedEventsJson String       @default("[\"*\"]")
+  secretKey            String
+  isActive             Boolean      @default(true)
+  failureCount         Int          @default(0)
+  lastDeliveryAt       DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@index([appId])
+  @@index([tenantId])
+}
+
+/// Official SDK Distribution Catalog Specs
+model SdkDistributionSpec {
+  id          String   @id @default(uuid())
+  language    String   @unique // JAVASCRIPT, TYPESCRIPT, NODEJS, REACT, REACT_NATIVE, FLUTTER, ANGULAR, VUE, DOTNET, JAVA, PYTHON, PHP, GO, REST, GRAPHQL, CLI
+  packageName String
+  version     String   @default("1.0.0")
+  downloadUrl String
+  docUrl      String
+  installCmd  String
+  codeSample  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Low-Code / No-Code Visual Builder Definitions
+model LowCodeComponent {
+  id                String   @id @default(uuid())
+  tenantId          String?
+  key               String   @unique
+  name              String
+  description       String?
+  componentType     String   @default("FORM") // FORM, WORKFLOW, PAGE, DASHBOARD, BUSINESS_RULE, DATA_MODEL, AUTOMATION, EMAIL_TEMPLATE, REPORT
+  builderSchemaJson String   @default("{}")
+  version           Int      @default(1)
+  isPublished       Boolean  @default(true)
+  createdByUserId   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  executions LowCodeExecution[]
+
+  @@index([tenantId])
+  @@index([componentType])
+}
+
+/// Low-Code Component Execution Instance
+model LowCodeExecution {
+  id               String           @id @default(uuid())
+  componentId      String
+  component        LowCodeComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  tenantId         String?
+  executedByUserId String?
+  status           String           @default("SUCCESS") // SUCCESS, ERROR, PENDING
+  inputDataJson    String           @default("{}")
+  outputDataJson   String           @default("{}")
+  durationMs       Int              @default(0)
+  createdAt        DateTime         @default(now())
+
+  @@index([componentId])
+  @@index([tenantId])
+}
+
+/// AI Marketplace Item Catalog
+model AiMarketplaceItem {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  itemType        String   @default("PROMPT") // PROMPT, AGENT, WORKFLOW, KNOWLEDGE_PACK, INDUSTRY_MODEL, REUSABLE_TEMPLATE
+  category        String   @default("GENERAL") // MARKETING, SALES, FINANCE, HR, DEV, OPERATIONS, GBP, SOCIAL
+  description     String
+  promptContent   String?
+  agentConfigJson String   @default("{}")
+  workflowJson    String   @default("{}")
+  author          String   @default("GBS AI Team")
+  ratingAverage   Float    @default(5.0)
+  downloads       Int      @default(0)
+  isFeatured      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([itemType])
+  @@index([category])
+}
+
+/// Unified Enterprise AI Copilot Session
+model EnterpriseCopilotSession {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  userId          String?
+  roleContext     String   @default("ADMIN") // ADMIN, PARTNER, CUSTOMER, DEVELOPER, MARKETING, CRM, FINANCE, ANALYTICS, GBP, SOCIAL
+  sessionTitle    String   @default("New Copilot Chat")
+  modelUsed       String   @default("gbs-copilot-v1")
+  tokenUsageTotal Int      @default(0)
+  status          String   @default("ACTIVE")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  messages EnterpriseCopilotMessage[]
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([roleContext])
+}
+
+/// Enterprise AI Copilot Chat Messages
+model EnterpriseCopilotMessage {
+  id           String                   @id @default(uuid())
+  sessionId    String
+  session      EnterpriseCopilotSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  senderRole   String                   @default("USER") // USER, ASSISTANT, SYSTEM
+  content      String
+  metadataJson String                   @default("{}")
+  createdAt    DateTime                 @default(now())
+
+  @@index([sessionId])
+}
+
+/// Voice AI Interactions & Transcripts
+model VoiceAiInteraction {
+  id               String   @id @default(uuid())
+  tenantId         String?
+  userId           String?
+  commandType      String   @default("SEARCH") // COMMAND, SEARCH, NAVIGATION, STT, TTS, ASSISTANT, MEETING_SUMMARY
+  transcriptText   String
+  responseAudioUrl String?
+  actionTaken      String?
+  executionMs      Int      @default(0)
+  status           String   @default("COMPLETED")
+  createdAt        DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([commandType])
+}
+
+/// Configurable Autonomous AI Agent Definition
+model AutonomousAiAgentConfig {
+  id               String    @id @default(uuid())
+  tenantId         String?
+  agentRole        String    @unique // MARKETING, SEO, REVIEW, SALES, FINANCE, CUSTOMER_SUCCESS, SUPPORT, DEVELOPER, MONITORING, SECURITY, COMPLIANCE, WORKFLOW
+  name             String
+  description      String?
+  systemPrompt     String
+  capabilitiesJson String    @default("[]")
+  scheduleCron     String?
+  isAutonomous     Boolean   @default(true)
+  status           String    @default("ACTIVE") // ACTIVE, PAUSED, MAINTENANCE
+  lastRunAt        DateTime?
+  totalTasksDone   Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  executions AutonomousAgentExecution[]
+
+  @@index([tenantId])
+  @@index([agentRole])
+}
+
+/// Autonomous AI Agent Task Execution History
+model AutonomousAgentExecution {
+  id           String                  @id @default(uuid())
+  agentId      String
+  agent        AutonomousAiAgentConfig @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tenantId     String?
+  taskName     String
+  inputContext String
+  outputResult String
+  status       String                  @default("SUCCESS") // SUCCESS, FAILED, RETRYING
+  executionMs  Int                     @default(0)
+  createdAt    DateTime                @default(now())
+
+  @@index([agentId])
+  @@index([tenantId])
+}
+
+/// Unified Enterprise Search Document Index
+model EnterpriseSearchDocumentIndex {
+  id         String   @id @default(uuid())
+  tenantId   String?
+  entityType String   @default("DOCUMENT") // PLATFORM, DOCUMENT, CUSTOMER, PARTNER, CRM, GBP, SOCIAL, REPORT, ANALYTICS, AI, FILE, LOG
+  entityId   String
+  title      String
+  snippet    String
+  fullText   String
+  tagsJson   String   @default("[]")
+  urlLink    String?
+  isIndexed  Boolean  @default(true)
+  indexedAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([entityType])
+  @@index([entityId])
+}
+
+/// Document Intelligence & OCR Records
+model DocumentIntelligenceRecord {
+  id               String   @id @default(uuid())
+  tenantId         String?
+  documentType     String   @default("INVOICE") // INVOICE, RECEIPT, CONTRACT, GENERAL_OCR, CLASSIFIED_DOC
+  fileName         String
+  fileUrl          String
+  extractedText    String
+  parsedFieldsJson String   @default("{}") // Extracted structured JSON data (amounts, dates, vendors)
+  confidenceScore  Float    @default(0.98)
+  summaryText      String?
+  status           String   @default("PROCESSED") // PROCESSED, PROCESSING, FAILED
+  processedAt      DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([documentType])
+}
+
+/// Enterprise Collaboration Teams & Channels
+model EnterpriseCollaborationTeam {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  name        String
+  description String?
+  isPrivate   Boolean  @default(false)
+  membersJson String   @default("[]") // Array of User IDs
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages EnterpriseCollaborationMessage[]
+
+  @@index([tenantId])
+}
+
+/// Enterprise Collaboration Chat & Workspace Messages
+model EnterpriseCollaborationMessage {
+  id              String                      @id @default(uuid())
+  teamId          String
+  team            EnterpriseCollaborationTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  senderUserId    String
+  senderName      String
+  messageText     String
+  mentionsJson    String                      @default("[]")
+  attachmentsJson String                      @default("[]")
+  approvalId      String?
+  createdAt       DateTime                    @default(now())
+
+  @@index([teamId])
+  @@index([senderUserId])
+}
+
+/// IoT Platform Telemetry Data
+model IotDeviceTelemetry {
+  id            String   @id @default(uuid())
+  tenantId      String?
+  deviceId      String
+  deviceType    String   @default("SENSOR") // SENSOR, INDUSTRIAL_EQUIPMENT, ASSET_TRACKER, GATEWAY
+  deviceName    String
+  telemetryJson String   @default("{}") // Temperature, Pressure, Location, Battery, Sensor metrics
+  status        String   @default("ONLINE") // ONLINE, OFFLINE, ALARM
+  readingAt     DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([deviceId])
+}
+
+/// Immutable Blockchain Audit & Certificate Ledger Record
+model BlockchainAuditRecord {
+  id                String   @id @default(uuid())
+  tenantId          String?
+  transactionType   String   @default("DIGITAL_CERTIFICATE") // DIGITAL_CERTIFICATE, IMMUTABLE_AUDIT, IDENTITY_VERIFY, ASSET_VERIFY
+  entityId          String
+  payloadHash       String   @unique
+  blockNumber       Int      @default(1000001)
+  blockchainNetwork String   @default("GBS_HYPERLEDGER_PRIVATE")
+  signature         String
+  verificationUrl   String
+  timestamp         DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([transactionType])
+}
+
+/// Digital Twin Simulation Model
+model DigitalTwinSimulation {
+  id             String   @id @default(uuid())
+  tenantId       String?
+  name           String
+  simulationType String   @default("BUSINESS_OPERATION") // BUSINESS_OPERATION, FORECASTING, SUPPLY_CHAIN, FINANCIAL_PREDICTION
+  parametersJson String   @default("{}")
+  resultJson     String   @default("{}")
+  accuracyScore  Float    @default(0.96)
+  executedAt     DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([simulationType])
+}
+
+// =============================================================================
+// GBS PLATFORM ENGINE EXPANSION MODELS
+// =============================================================================
+
+/// Dynamic OTP, Provider & Login Policy Configuration
+model OtpPolicyConfig {
+  id                      String   @id @default(uuid())
+  tenantId                String?  @unique
+  smsProvider             String   @default("TWILIO") // TWILIO, AWS_SNS, INFOBIP, PLIVO, VONAGE, MSG91
+  smsProviderConfigJson   String   @default("{}")
+  whatsappProvider        String   @default("META_CLOUD_API") // META_CLOUD_API, TWILIO, GUPSHUP, INFOBIP, ZOKO
+  whatsappConfigJson      String   @default("{}")
+  otpExpiryMinutes        Int      @default(10)
+  otpLength               Int      @default(6)
+  maxRetryCount           Int      @default(5)
+  resendLimit             Int      @default(3)
+  dailyLimit              Int      @default(20)
+  countryRestrictionsJson String   @default("[]") // Restricted ISO country codes
+  loginPoliciesJson       String   @default("{}") // Password policies, MFA rules, lockout settings
+  passwordPoliciesJson    String   @default("{}") // Complexity rules, expiration, history
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/// Business Profile Granular Access Control
+model BusinessProfileAccessControl {
+  id                      String    @id @default(uuid())
+  locationId              String    @unique
+  tenantId                String?
+  status                  String    @default("PENDING") // PENDING, APPROVED, REJECTED, DISABLED
+  isEditingRestricted     Boolean   @default(false)
+  isReviewReplyRestricted Boolean   @default(false)
+  isPostingRestricted     Boolean   @default(false)
+  isProductsRestricted    Boolean   @default(false)
+  isServicesRestricted    Boolean   @default(false)
+  isAnalyticsRestricted   Boolean   @default(false)
+  isMessagingRestricted   Boolean   @default(false)
+  isLocationsRestricted   Boolean   @default(false)
+  approvedByUserId        String?
+  approvedAt              DateTime?
+  rejectionReason         String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+/// Subscription Limits Override & Config
+model SubscriptionLimitConfig {
+  id                 String   @id @default(uuid())
+  tenantId           String   @unique
+  planId             String?
+  limitsJson         String   @default("{}") // JSON map of 30+ limit keys to numerical limits
+  adminOverride      Boolean  @default(false)
+  overriddenByUserId String?
+  overrideReason     String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/// Dynamic Directory Platform Adapters
+model DirectoryProviderConfig {
+  id                String   @id @default(uuid())
+  providerKey       String   @unique // GOOGLE_BUSINESS, APPLE_BUSINESS, BING_PLACES, META_BUSINESS, LINKEDIN_COMPANY, YELP, FOURSQUARE, TRIPADVISOR, TRUSTPILOT, YELLOW_PAGES, BBB, NEXTDOOR, BAIDU_MAPS, YANDEX_BUSINESS, TOMTOM_PLACES, HERE_PLACES, OPENSTREETMAP
+  providerName      String
+  category          String   @default("DIRECTORY")
+  isEnabled         Boolean  @default(true)
+  apiBaseUrl        String?
+  credentialsJson   String   @default("{}")
+  supportsListings  Boolean  @default(true)
+  supportsReviews   Boolean  @default(true)
+  supportsPosts     Boolean  @default(true)
+  supportsAnalytics Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  listings BusinessDirectoryListing[]
+}
+
+/// Multi-Platform Unified Business Listing
+model BusinessDirectoryListing {
+  id                String                  @id @default(uuid())
+  tenantId          String
+  providerId        String
+  provider          DirectoryProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  externalListingId String?
+  businessName      String
+  address           String?
+  phone             String?
+  websiteUrl        String?
+  status            String                  @default("ACTIVE") // ACTIVE, PENDING_SYNC, SYNC_ERROR, SUSPENDED
+  syncStatus        String                  @default("HEALTHY")
+  lastSyncedAt      DateTime?
+  metadataJson      String                  @default("{}")
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  @@unique([tenantId, providerId, externalListingId])
+  @@index([tenantId])
+  @@index([providerId])
+}
+
+/// WhatsApp Marketing Campaign & Audiences
+model WhatsAppMarketingCampaign {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  name               String
+  campaignType       String    @default("BROADCAST") // BROADCAST, MARKETING, LEAD_NURTURE, RETARGETING
+  status             String    @default("DRAFT") // DRAFT, SCHEDULED, SENDING, COMPLETED, PAUSED, CANCELLED
+  templateId         String?
+  messageContent     String
+  mediaUrl           String?
+  audienceFilterJson String    @default("{}")
+  scheduledAt        DateTime?
+  sentAt             DateTime?
+  totalRecipients    Int       @default(0)
+  deliveredCount     Int       @default(0)
+  readCount          Int       @default(0)
+  clickedCount       Int       @default(0)
+  failedCount        Int       @default(0)
+  conversionCount    Int       @default(0)
+  abVariantId        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+/// WhatsApp Contact Audience Group & Tags
+model WhatsAppContactGroup {
+  id           String   @id @default(uuid())
+  tenantId     String
+  name         String
+  description  String?
+  tagsJson     String   @default("[]")
+  contactCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/// WhatsApp Consent & Opt-In/Opt-Out Ledger
+model WhatsAppConsentLog {
+  id            String    @id @default(uuid())
+  tenantId      String
+  phoneNumber   String
+  consentStatus String    @default("OPTED_IN") // OPTED_IN, OPTED_OUT, PENDING
+  optInSource   String?   @default("WEBSITE_FORM")
+  optedOutAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([tenantId, phoneNumber])
+  @@index([tenantId])
+}
+
+/// Customer CRM Unified Contact Timeline
+model CustomerCrmTimelineRecord {
+  id              String   @id @default(uuid())
+  tenantId        String
+  customerId      String
+  interactionType String // CONTACT, COMMUNICATION, WHATSAPP, EMAIL, SMS, GOOGLE_REVIEW, PROFILE_CONNECT, SOCIAL_ACCOUNT, MARKETING_CAMPAIGN, AI_RECOMMENDATION
+  summary         String
+  detailsJson     String   @default("{}")
+  aiInsights      String?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([interactionType])
+}
+
+// =============================================================================
+// PHASE 19 – ENTERPRISE CUSTOMER ENGAGEMENT PLATFORM MODELS
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// 1. Unified Inbox Subsystem
+// -----------------------------------------------------------------------------
+
+model UnifiedConversation {
+  id             String   @id @default(uuid())
+  tenantId       String
+  customerId     String?
+  channel        String   @default("LIVE_CHAT") // GBP, GOOGLE_REVIEWS, FACEBOOK, INSTAGRAM, WHATSAPP, EMAIL, SMS, LIVE_CHAT, TELEGRAM, TEAMS
+  subject        String?
+  status         String   @default("OPEN") // UNREAD, OPEN, IN_PROGRESS, CLOSED, ARCHIVED, SPAM
+  priority       String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  assignedUserId String?
+  labelsJson     String   @default("[]")
+  tagsJson       String   @default("[]")
+  folder         String   @default("INBOX") // INBOX, UNREAD, PRIORITY, SPAM, ARCHIVE
+  isPinned       Boolean  @default(false)
+  isSpam         Boolean  @default(false)
+  sentiment      String   @default("NEUTRAL") // POSITIVE, NEUTRAL, NEGATIVE
+  aiSummary      String?
+  lastMessageAt  DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  messages UnifiedMessage[]
+
+  @@index([tenantId])
+  @@index([channel])
+  @@index([status])
+  @@index([priority])
+  @@index([assignedUserId])
+  @@index([folder])
+}
+
+model UnifiedMessage {
+  id               String              @id @default(uuid())
+  conversationId   String
+  conversation     UnifiedConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderType       String              @default("CUSTOMER") // CUSTOMER, AGENT, BOT, SYSTEM
+  senderId         String?
+  senderName       String?
+  content          String
+  contentType      String              @default("TEXT") // TEXT, MEDIA, VOICE, ATTACHMENT
+  mediaUrlsJson    String              @default("[]")
+  translatedText   String?
+  aiSuggestedReply String?
+  isInternalNote   Boolean             @default(false)
+  mentionsJson     String              @default("[]")
+  metadataJson     String              @default("{}")
+  createdAt        DateTime            @default(now())
+
+  @@index([conversationId])
+  @@index([senderType])
+}
+
+model InboxProviderConfig {
+  id              String   @id @default(uuid())
+  tenantId        String
+  providerKey     String // GBP, GOOGLE_REVIEWS, FACEBOOK, INSTAGRAM, WHATSAPP, EMAIL, SMS, LIVE_CHAT, TELEGRAM, TEAMS
+  isEnabled       Boolean  @default(true)
+  credentialsJson String   @default("{}")
+  settingsJson    String   @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, providerKey])
+  @@index([tenantId])
+}
+
+model ConversationMergeLog {
+  id                        String   @id @default(uuid())
+  tenantId                  String
+  targetConversationId      String
+  mergedConversationIdsJson String   @default("[]")
+  mergedByUserId            String
+  mergedAt                  DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// -----------------------------------------------------------------------------
+// 2. Enterprise Call Center Subsystem
+// -----------------------------------------------------------------------------
+
+model CallRecord {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  callType              String   @default("INCOMING") // INCOMING, OUTGOING
+  callMode              String   @default("BROWSER") // BROWSER, MOBILE, CLICK_TO_CALL
+  callerNumber          String
+  calleeNumber          String
+  assignedUserId        String?
+  queueName             String?
+  status                String   @default("COMPLETED") // RINGING, IN_PROGRESS, COMPLETED, MISSED, VOICEMAIL, TRANSFERRED
+  durationSec           Int      @default(0)
+  recordingUrl          String?
+  voicemailUrl          String?
+  callNotes             String?
+  ivrPathJson           String   @default("[]")
+  aiTranscription       String?
+  aiSummary             String?
+  aiSentiment           String?  @default("NEUTRAL")
+  aiActionItemsJson     String   @default("[]")
+  holdDurationSec       Int      @default(0)
+  whisperUserId         String?
+  conferenceUserIdsJson String   @default("[]")
+  createdAt             DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([callType])
+  @@index([status])
+  @@index([assignedUserId])
+}
+
+model CallQueueConfig {
+  id                String   @id @default(uuid())
+  tenantId          String
+  queueName         String
+  routingType       String   @default("ROUND_ROBIN") // ROUND_ROBIN, PRIORITY, SKILL_BASED
+  agentUserIdsJson  String   @default("[]")
+  maxWaitTimeSec    Int      @default(300)
+  fallbackVoicemail Boolean  @default(true)
+  isEnabled         Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model IvrConfig {
+  id               String   @id @default(uuid())
+  tenantId         String
+  name             String
+  greetingAudioUrl String?
+  menuNodesJson    String   @default("[]")
+  isEnabled        Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model CallbackSchedule {
+  id             String   @id @default(uuid())
+  tenantId       String
+  customerId     String?
+  phoneNumber    String
+  scheduledTime  DateTime
+  status         String   @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  assignedUserId String?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+// -----------------------------------------------------------------------------
+// 3. Appointment & Booking System Subsystem
+// -----------------------------------------------------------------------------
+
+model AppointmentBooking {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  customerId          String?
+  customerName        String
+  customerEmail       String
+  customerPhone       String?
+  serviceName         String
+  staffId             String?
+  staffName           String?
+  locationId          String?
+  startTime           DateTime
+  endTime             DateTime
+  status              String   @default("SCHEDULED") // SCHEDULED, CONFIRMED, CHECKED_IN, COMPLETED, RESCHEDULED, CANCELLED
+  meetingType         String   @default("IN_PERSON") // IN_PERSON, ZOOM, MS_TEAMS, PHONE
+  meetingUrl          String?
+  calendarEventIdSync String?
+  bufferMinutes       Int      @default(15)
+  cancellationReason  String?
+  qrCheckInCode       String?  @unique
+  reminderSent        Boolean  @default(false)
+  paymentStatus       String   @default("NOT_REQUIRED") // NOT_REQUIRED, PENDING, PAID, REFUNDED
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([startTime])
+  @@index([staffId])
+}
+
+model StaffAvailabilityRule {
+  id             String   @id @default(uuid())
+  tenantId       String
+  staffId        String
+  dayOfWeek      Int // 0 (Sun) - 6 (Sat)
+  startTime      String // "09:00"
+  endTime        String // "17:00"
+  breakTimesJson String   @default("[]")
+  isAvailable    Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId, staffId])
+}
+
+model BookingWidgetConfig {
+  id                      String   @id @default(uuid())
+  tenantId                String   @unique
+  widgetTitle             String   @default("Book an Appointment")
+  colorScheme             String   @default("#D4AF37")
+  customCss               String?
+  allowedServicesJson     String   @default("[]")
+  bufferMinutes           Int      @default(15)
+  cancellationNoticeHours Int      @default(24)
+  isEnabled               Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model CalendarSyncConfig {
+  id             String    @id @default(uuid())
+  tenantId       String
+  userId         String
+  provider       String // GOOGLE_CALENDAR, OUTLOOK
+  syncCalendarId String?
+  accessToken    String?
+  refreshToken   String?
+  lastSyncedAt   DateTime?
+  isEnabled      Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([tenantId, userId, provider])
+  @@index([tenantId])
+}
+
+model MeetingIntegrationConfig {
+  id              String   @id @default(uuid())
+  tenantId        String
+  provider        String // ZOOM, MS_TEAMS
+  apiKey          String?
+  apiSecret       String?
+  oauthConfigJson String   @default("{}")
+  isEnabled       Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+}
+
+// -----------------------------------------------------------------------------
+// 4. Data Retention & Compliance Export Subsystem
+// -----------------------------------------------------------------------------
+
+model DataRetentionPolicy {
+  id                String   @id @default(uuid())
+  tenantId          String? // null = platform default policy
+  countryCode       String?  @default("GLOBAL")
+  moduleName        String // INBOX, CALLS, BOOKINGS, AUDIT, AI_LOGS, BILLING, SYSTEM
+  retentionDays     Int      @default(365)
+  autoCleanupAction String   @default("ARCHIVE") // ARCHIVE, PURGE
+  legalHold         Boolean  @default(false)
+  createdByUserId   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([moduleName])
+}
+
+model ArchivedRecordLedger {
+  id               String    @id @default(uuid())
+  tenantId         String
+  moduleName       String
+  originalId       String
+  archivedDataJson String
+  archivedAt       DateTime  @default(now())
+  restoredAt       DateTime?
+  restoredByUserId String?
+
+  @@index([tenantId])
+  @@index([moduleName])
+}
+
+model ComplianceExportJob {
+  id                String    @id @default(uuid())
+  tenantId          String
+  requestedByUserId String
+  exportType        String // AUDIT_LOGS, ACTIVITY, SECURITY, COMMUNICATION, CUSTOMER, INVOICES, SUBSCRIPTIONS, AI_LOGS, SYSTEM
+  format            String    @default("PDF") // PDF, EXCEL, CSV, JSON
+  dateRangeStart    DateTime?
+  dateRangeEnd      DateTime?
+  status            String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  fileUrl           String?
+  fileSizeMb        Float     @default(0.0)
+  createdAt         DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model EnterpriseComplianceRule {
+  id             String   @id @default(uuid())
+  tenantId       String?
+  ruleName       String
+  category       String   @default("SECURITY") // SECURITY, COMPLIANCE, AUDIT, APPROVALS, RETENTION
+  severity       String   @default("HIGH")
+  conditionsJson String   @default("{}")
+  isEnforced     Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+}

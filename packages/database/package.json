@@ -1,0 +1,19 @@
+{
+  "name": "@saas/database",
+  "version": "0.0.0",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "scripts": {
+    "build": "prisma generate",
+    "db:push": "prisma db push --accept-data-loss",
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "prisma": "^6.4.0",
+    "typescript": "^5.0.0"
+  }
+}

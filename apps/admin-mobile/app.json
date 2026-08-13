@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "GBS Admin Mobile",
+    "slug": "admin-mobile",
+    "scheme": "gbsadmin",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-system-ui", "expo-secure-store"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gbs.admin",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allows GBS Admin to capture business verification photos and document scans.",
+        "NSMicrophoneUsageDescription": "Allows GBS Admin to execute voice search and assistant commands.",
+        "NSFaceIDUsageDescription": "Allows GBS Admin to authenticate using Face ID.",
+        "NSLocationWhenInUseUsageDescription": "Allows GBS Admin to locate nearby business locations."
+      }
+    },
+    "android": {
+      "package": "com.gbs.admin",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "USE_BIOMETRIC"
+      ],
+      "predictiveBackGestureEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
